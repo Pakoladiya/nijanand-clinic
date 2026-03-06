@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react'
-import { Camera, RefreshCw, Check, Upload } from 'lucide-react'
+import { useRef } from 'react'
+import { Camera, RefreshCw, Check, Image } from 'lucide-react'
 
 interface CameraCaptureProps {
   onCapture: (dataUrl: string) => void
@@ -7,63 +7,10 @@ interface CameraCaptureProps {
 }
 
 export default function CameraCapture({ onCapture, captured }: CameraCaptureProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [streaming, setStreaming] = useState(false)
-  const [error, setError] = useState('')
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
 
-  const startCamera = useCallback(async () => {
-    setError('')
-    try {
-      // Try front camera first, fall back to any camera
-      let stream: MediaStream
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user' }
-        })
-      } catch {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true })
-      }
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
-        setStreaming(true)
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err)
-      if (msg.includes('Permission') || msg.includes('permission') || msg.includes('denied')) {
-        setError('Camera permission denied. Please allow camera in browser settings.')
-      } else if (msg.includes('NotFound') || msg.includes('notfound')) {
-        setError('No camera found on this device.')
-      } else {
-        setError('Could not open camera. Try using Upload instead.')
-      }
-    }
-  }, [])
-
-  const stopCamera = useCallback(() => {
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream
-      stream.getTracks().forEach(t => t.stop())
-      videoRef.current.srcObject = null
-    }
-    setStreaming(false)
-  }, [])
-
-  const takePhoto = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return
-    const canvas = canvasRef.current
-    canvas.width = videoRef.current.videoWidth
-    canvas.height = videoRef.current.videoHeight
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.drawImage(videoRef.current, 0, 0)
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
-    onCapture(dataUrl)
-    stopCamera()
-  }, [onCapture, stopCamera])
-
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
@@ -71,6 +18,8 @@ export default function CameraCapture({ onCapture, captured }: CameraCaptureProp
       if (ev.target?.result) onCapture(ev.target.result as string)
     }
     reader.readAsDataURL(file)
+    // Reset input so same file can be selected again
+    e.target.value = ''
   }
 
   if (captured) {
@@ -84,7 +33,7 @@ export default function CameraCapture({ onCapture, captured }: CameraCaptureProp
             <Check size={14} color="white" />
           </div>
         </div>
-        <button type="button" onClick={() => { onCapture(''); stopCamera() }}
+        <button type="button" onClick={() => onCapture('')}
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
           <RefreshCw size={14} /> Retake Photo
         </button>
@@ -94,41 +43,24 @@ export default function CameraCapture({ onCapture, captured }: CameraCaptureProp
 
   return (
     <div className="flex flex-col items-center gap-3">
-      {streaming ? (
-        <div className="flex flex-col items-center gap-3">
-          <video ref={videoRef} className="w-48 h-36 rounded-xl object-cover bg-black" autoPlay playsInline muted />
-          <canvas ref={canvasRef} className="hidden" />
-          <div className="flex gap-2">
-            <button type="button" onClick={takePhoto}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-medium"
-              style={{ backgroundColor: '#39A900' }}>
-              <Camera size={16} /> Capture
-            </button>
-            <button type="button" onClick={stopCamera}
-              className="px-4 py-2 rounded-xl text-sm text-gray-600 border border-gray-300">
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-32 h-32 rounded-full bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300">
-            <Camera size={32} className="text-gray-400" />
-          </div>
-          {error && <p className="text-red-500 text-xs text-center">{error}</p>}
-          <div className="flex gap-2">
-            <button type="button" onClick={startCamera}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-medium"
-              style={{ backgroundColor: '#F6A000' }}>
-              <Camera size={16} /> Open Camera
-            </button>
-            <label className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-gray-600 border border-gray-300 cursor-pointer hover:bg-gray-50">
-              <Upload size={16} /> Upload
-              <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
-            </label>
-          </div>
-        </div>
-      )}
+      <div className="w-32 h-32 rounded-full bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300">
+        <Camera size={32} className="text-gray-400" />
+      </div>
+      <div className="flex gap-2">
+        {/* Opens camera app directly */}
+        <label className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-medium cursor-pointer"
+          style={{ backgroundColor: '#F6A000' }}>
+          <Camera size={16} /> Open Camera
+          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment"
+            className="hidden" onChange={handleFile} />
+        </label>
+        {/* Opens gallery */}
+        <label className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-gray-600 border border-gray-300 cursor-pointer hover:bg-gray-50">
+          <Image size={16} /> Gallery
+          <input ref={galleryInputRef} type="file" accept="image/*"
+            className="hidden" onChange={handleFile} />
+        </label>
+      </div>
     </div>
   )
 }
