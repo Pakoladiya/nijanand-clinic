@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase, generateRegistrationNumber, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import CameraCapture from '../components/CameraCapture'
@@ -13,22 +13,45 @@ export default function RegisterPatient() {
   const { staff } = useAuth()
   const [form, setForm] = useState({
     name: '', age: '', gender: 'Male' as 'Male' | 'Female' | 'Other',
-    phone: '', address: '', chief_complaint: '', referred_by: '',
+    phone: '', address: '', referred_by: '',
     fees_type: 'per_session' as 'per_session' | 'package',
     fees_amount: '350',
   })
+  const [selectedComplaints, setSelectedComplaints] = useState<string[]>([])
+  const [otherComplaint, setOtherComplaint] = useState('')
+  const [refSuggestions, setRefSuggestions] = useState<string[]>([])
   const [photo, setPhoto] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [newPatient, setNewPatient] = useState<Patient | null>(null)
 
+  useEffect(() => {
+    supabase.from('patients').select('referred_by').not('referred_by', 'is', null)
+      .then(({ data }) => {
+        if (data) {
+          const unique = [...new Set(data.map((r: any) => r.referred_by).filter(Boolean))] as string[]
+          setRefSuggestions(unique)
+        }
+      })
+  }, [])
+
   function set(field: string, value: string) {
     setForm(f => ({ ...f, [field]: value }))
+  }
+
+  function toggleComplaint(c: string) {
+    setSelectedComplaints(prev =>
+      prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]
+    )
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!staff) return
+    const complaints = selectedComplaints.includes('Other')
+      ? [...selectedComplaints.filter(c => c !== 'Other'), otherComplaint.trim()].filter(Boolean)
+      : selectedComplaints
+    if (complaints.length === 0) { setError('Please select at least one chief complaint.'); return }
     setLoading(true)
     setError('')
 
@@ -59,7 +82,7 @@ export default function RegisterPatient() {
         phone: form.phone.trim(),
         address: form.address.trim(),
         photo_url: photoUrl,
-        chief_complaint: form.chief_complaint,
+        chief_complaint: complaints.join(', '),
         fees_type: form.fees_type,
         fees_amount: parseFloat(form.fees_amount),
         referred_by: form.referred_by.trim() || null,
@@ -76,7 +99,9 @@ export default function RegisterPatient() {
 
       setNewPatient(data)
       setForm({ name: '', age: '', gender: 'Male', phone: '', address: '',
-        chief_complaint: '', referred_by: '', fees_type: 'per_session', fees_amount: '350' })
+        referred_by: '', fees_type: 'per_session', fees_amount: '350' })
+      setSelectedComplaints([])
+      setOtherComplaint('')
       setPhoto('')
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.')
@@ -154,28 +179,36 @@ export default function RegisterPatient() {
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Ref. By</label>
             <input value={form.referred_by} onChange={e => set('referred_by', e.target.value)}
-              placeholder="Referred by (optional)"
+              placeholder="Referred by (optional)" list="ref-suggestions"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
+            <datalist id="ref-suggestions">
+              {refSuggestions.map(s => <option key={s} value={s} />)}
+            </datalist>
           </div>
         </div>
 
         {/* Chief Complaint */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
-          <p className="text-sm font-semibold text-gray-700">Chief Complaint</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">Chief Complaint</p>
+            {selectedComplaints.length > 0 && (
+              <span className="text-xs text-gray-400">{selectedComplaints.length} selected</span>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2">
             {COMPLAINTS.map(c => (
               <button type="button" key={c}
-                onClick={() => set('chief_complaint', c)}
+                onClick={() => toggleComplaint(c)}
                 className="px-3 py-1.5 rounded-full text-xs font-medium border transition-colors"
-                style={form.chief_complaint === c
+                style={selectedComplaints.includes(c)
                   ? { backgroundColor: '#F6A000', borderColor: '#F6A000', color: 'white' }
                   : { backgroundColor: 'white', borderColor: '#e5e7eb', color: '#374151' }}>
                 {c}
               </button>
             ))}
           </div>
-          {form.chief_complaint === 'Other' && (
-            <input onChange={e => set('chief_complaint', e.target.value)}
+          {selectedComplaints.includes('Other') && (
+            <input value={otherComplaint} onChange={e => setOtherComplaint(e.target.value)}
               placeholder="Describe complaint"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
           )}
@@ -214,7 +247,7 @@ export default function RegisterPatient() {
           </div>
         )}
 
-        <button type="submit" disabled={loading || !form.chief_complaint}
+        <button type="submit" disabled={loading || selectedComplaints.length === 0}
           className="w-full py-4 rounded-xl text-white font-semibold text-sm transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
           style={{ backgroundColor: '#F6A000' }}>
           {loading ? 'Registering...' : (
