@@ -24,6 +24,7 @@ export interface Patient {
   chief_complaint: string
   fees_type: FeesType
   fees_amount: number
+  referred_by: string | null
   registered_by: string
   registered_by_name?: string
   created_at: string

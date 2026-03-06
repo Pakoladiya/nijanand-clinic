@@ -13,7 +13,7 @@ export default function RegisterPatient() {
   const { staff } = useAuth()
   const [form, setForm] = useState({
     name: '', age: '', gender: 'Male' as 'Male' | 'Female' | 'Other',
-    phone: '', address: '', chief_complaint: '',
+    phone: '', address: '', chief_complaint: '', referred_by: '',
     fees_type: 'per_session' as 'per_session' | 'package',
     fees_amount: '350',
   })
@@ -62,6 +62,7 @@ export default function RegisterPatient() {
         chief_complaint: form.chief_complaint,
         fees_type: form.fees_type,
         fees_amount: parseFloat(form.fees_amount),
+        referred_by: form.referred_by.trim() || null,
         registered_by: staff.id,
       }
 
@@ -75,7 +76,7 @@ export default function RegisterPatient() {
 
       setNewPatient(data)
       setForm({ name: '', age: '', gender: 'Male', phone: '', address: '',
-        chief_complaint: '', fees_type: 'per_session', fees_amount: '350' })
+        chief_complaint: '', referred_by: '', fees_type: 'per_session', fees_amount: '350' })
       setPhoto('')
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.')
@@ -148,6 +149,13 @@ export default function RegisterPatient() {
               placeholder="Patient's address" rows={2}
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 resize-none"
               required />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Ref. By</label>
+            <input value={form.referred_by} onChange={e => set('referred_by', e.target.value)}
+              placeholder="Referred by (optional)"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
           </div>
         </div>
 
