@@ -15,16 +15,29 @@ export default function CameraCapture({ onCapture, captured }: CameraCaptureProp
   const startCamera = useCallback(async () => {
     setError('')
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
-      })
+      // Try front camera first, fall back to any camera
+      let stream: MediaStream
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user' }
+        })
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true })
+      }
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        videoRef.current.play()
+        await videoRef.current.play()
         setStreaming(true)
       }
-    } catch {
-      setError('Camera access denied. Please allow camera permission.')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.includes('Permission') || msg.includes('permission') || msg.includes('denied')) {
+        setError('Camera permission denied. Please allow camera in browser settings.')
+      } else if (msg.includes('NotFound') || msg.includes('notfound')) {
+        setError('No camera found on this device.')
+      } else {
+        setError('Could not open camera. Try using Upload instead.')
+      }
     }
   }, [])
 
@@ -116,7 +129,6 @@ export default function CameraCapture({ onCapture, captured }: CameraCaptureProp
           </div>
         </div>
       )}
-      <canvas ref={canvasRef} className="hidden" />
     </div>
   )
 }
