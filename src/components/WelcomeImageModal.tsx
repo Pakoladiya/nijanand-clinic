@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import html2canvas from 'html2canvas'
 import { Download, X, Share2 } from 'lucide-react'
 import type { Patient } from '../types'
@@ -7,6 +7,20 @@ interface Props { patient: Patient; onClose: () => void }
 
 export default function WelcomeImageModal({ patient, onClose }: Props) {
   const cardRef = useRef<HTMLDivElement>(null)
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null)
+
+  // Pre-fetch patient photo as base64 so html2canvas can embed it (avoids CORS blank image)
+  useEffect(() => {
+    if (!patient.photo_url) return
+    fetch(patient.photo_url)
+      .then(r => r.blob())
+      .then(blob => {
+        const reader = new FileReader()
+        reader.onloadend = () => setPhotoBase64(reader.result as string)
+        reader.readAsDataURL(blob)
+      })
+      .catch(() => setPhotoBase64(null))
+  }, [patient.photo_url])
 
   async function downloadImage() {
     if (!cardRef.current) return
@@ -113,11 +127,20 @@ export default function WelcomeImageModal({ patient, onClose }: Props) {
 
               {/* Left column: Photo */}
               <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                {patient.photo_url ? (
-                  <img src={patient.photo_url} alt={patient.name} crossOrigin="anonymous"
+                {photoBase64 ? (
+                  <img src={photoBase64} alt={patient.name}
                     style={{ width: 76, height: 90, objectFit: 'cover', borderRadius: 8,
                       border: '2.5px solid #F6A000',
                       boxShadow: '0 2px 8px rgba(246,160,0,0.3)' }} />
+                ) : patient.photo_url ? (
+                  /* Photo loading — show placeholder */
+                  <div style={{ width: 76, height: 90, borderRadius: 8,
+                    background: '#FEF3C7', border: '2.5px solid #F6A000',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#F6A000', fontSize: 10, fontFamily: gujFont, textAlign: 'center',
+                    padding: 4 }}>
+                    ફોટો લોડ...
+                  </div>
                 ) : (
                   <div style={{ width: 76, height: 90, borderRadius: 8,
                     background: 'linear-gradient(135deg, #F6A000, #e08800)',
@@ -227,14 +250,18 @@ export default function WelcomeImageModal({ patient, onClose }: Props) {
         {/* Action Buttons */}
         <div className="flex gap-3 px-4 pb-4">
           <button onClick={downloadImage}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold"
+            disabled={!!patient.photo_url && !photoBase64}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold disabled:opacity-50"
             style={{ backgroundColor: '#39A900' }}>
-            <Download size={16} /> JPG ડાઉનલોડ
+            <Download size={16} />
+            {patient.photo_url && !photoBase64 ? 'ફોટો લોડ...' : 'JPG ડાઉનલોડ'}
           </button>
           <button onClick={shareImage}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold"
+            disabled={!!patient.photo_url && !photoBase64}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold disabled:opacity-50"
             style={{ backgroundColor: '#F6A000' }}>
-            <Share2 size={16} /> શેર કરો
+            <Share2 size={16} />
+            {patient.photo_url && !photoBase64 ? 'ફોટો લોડ...' : 'શેર કરો'}
           </button>
         </div>
       </div>
