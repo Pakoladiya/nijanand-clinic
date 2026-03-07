@@ -17,10 +17,15 @@ export default function RegisterPatient() {
   // Restore draft from localStorage on first load
   const savedDraft = (() => { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null') } catch { return null } })()
 
-  const [form, setForm] = useState(savedDraft?.form ?? {
-    name: '', age: '', gender: 'Male' as 'Male' | 'Female' | 'Other',
+  const [form, setForm] = useState<{
+    name: string; age: string; gender: 'Male' | 'Female' | 'Other';
+    phone: string; address: string; referred_by: string;
+    fees_type: 'per_session' | 'package'; fees_amount: string;
+    previous_sessions: string;
+  }>(savedDraft?.form ?? {
+    name: '', age: '', gender: 'Male',
     phone: '', address: '', referred_by: '',
-    fees_type: 'per_session' as 'per_session' | 'package',
+    fees_type: 'per_session',
     fees_amount: '350',
     previous_sessions: '0',
   })
