@@ -45,7 +45,7 @@ export default function WelcomeImageModal({ patient, onClose }: Props) {
     ? `₹${patient.fees_amount} પ્રતિ સત્ર`
     : `₹${patient.fees_amount} (પેકેજ)`
 
-  const gujFont = "'Noto Sans Gujarati', Arial, sans-serif"
+  const gujFont = "'Anek Gujarati', Arial, sans-serif"
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
