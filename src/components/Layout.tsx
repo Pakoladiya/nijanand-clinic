@@ -26,14 +26,7 @@ export default function Layout({ page, setPage, children }: LayoutProps) {
       <header className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-20">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #F6A000, #39A900)' }}>
-              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-                <circle cx="12" cy="12" r="10" fill="#F6A000" />
-                <circle cx="12" cy="7" r="2.5" fill="white" />
-                <path d="M7 17 Q9.5 13 12 12 Q14.5 13 17 17" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-              </svg>
-            </div>
+            <img src="/logo.png" alt="NFC Logo" className="w-9 h-9 object-contain" />
             <div>
               <p className="text-sm font-bold text-gray-800 leading-none">Nijanand FC</p>
               <p className="text-xs text-gray-400 leading-none">{staff?.name}</p>

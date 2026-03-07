@@ -23,16 +23,7 @@ export default function LoginPage() {
       <div className="max-w-sm w-full">
         {/* Logo Area */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4 shadow-md"
-            style={{ background: 'linear-gradient(135deg, #F6A000, #39A900)' }}>
-            <svg viewBox="0 0 60 60" className="w-12 h-12" fill="none">
-              <circle cx="30" cy="30" r="28" fill="#F6A000" />
-              <path d="M30 8 C18 8 10 18 10 28 C10 40 20 52 30 52 C40 52 50 40 50 28 C50 18 42 8 30 8Z" fill="#39A900" opacity="0.4"/>
-              <circle cx="30" cy="18" r="6" fill="white" />
-              <path d="M18 38 Q24 28 30 26 Q36 28 42 38" stroke="white" strokeWidth="3" fill="none" strokeLinecap="round"/>
-              <path d="M22 44 L24 36 M38 44 L36 36" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
-            </svg>
-          </div>
+          <img src="/logo.png" alt="NFC Logo" className="w-24 h-24 object-contain mb-4 drop-shadow-md" />
           <h1 className="text-2xl font-bold text-gray-800">Nijanand</h1>
           <p className="font-semibold" style={{ color: '#39A900' }}>Fitness Centre</p>
           <p className="text-xs text-gray-400 mt-1">Clinic Management System</p>
