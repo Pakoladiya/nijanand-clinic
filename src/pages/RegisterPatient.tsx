@@ -60,8 +60,15 @@ export default function RegisterPatient() {
       })
   }, [])
 
+  const TITLE_CASE_FIELDS = ['name', 'address', 'referred_by']
+
+  function toTitleCase(str: string) {
+    return str.replace(/\b\w/g, c => c.toUpperCase())
+  }
+
   function set(field: string, value: string) {
-    setForm(f => ({ ...f, [field]: value }))
+    const processed = TITLE_CASE_FIELDS.includes(field) ? toTitleCase(value) : value
+    setForm(f => ({ ...f, [field]: processed }))
   }
 
   function toggleComplaint(c: string) {
