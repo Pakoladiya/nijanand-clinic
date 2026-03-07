@@ -25,6 +25,7 @@ export interface Patient {
   fees_type: FeesType
   fees_amount: number
   referred_by: string | null
+  previous_sessions: number
   registered_by: string
   registered_by_name?: string
   created_at: string

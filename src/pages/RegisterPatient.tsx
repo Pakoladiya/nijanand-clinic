@@ -16,6 +16,7 @@ export default function RegisterPatient() {
     phone: '', address: '', referred_by: '',
     fees_type: 'per_session' as 'per_session' | 'package',
     fees_amount: '350',
+    previous_sessions: '0',
   })
   const [selectedComplaints, setSelectedComplaints] = useState<string[]>([])
   const [otherComplaint, setOtherComplaint] = useState('')
@@ -90,6 +91,7 @@ export default function RegisterPatient() {
         fees_type: form.fees_type,
         fees_amount: parseFloat(form.fees_amount),
         referred_by: form.referred_by.trim() || null,
+        previous_sessions: parseInt(form.previous_sessions) || 0,
         registered_by: staff.id,
       }
 
@@ -103,7 +105,7 @@ export default function RegisterPatient() {
 
       setNewPatient(data)
       setForm({ name: '', age: '', gender: 'Male', phone: '', address: '',
-        referred_by: '', fees_type: 'per_session', fees_amount: '350' })
+        referred_by: '', fees_type: 'per_session', fees_amount: '350', previous_sessions: '0' })
       setSelectedComplaints([])
       setOtherComplaint('')
       setPhoto('')
@@ -198,6 +200,19 @@ export default function RegisterPatient() {
             <datalist id="ref-suggestions">
               {refSuggestions.map(s => <option key={s} value={s} />)}
             </datalist>
+          </div>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <label className="block text-xs font-medium text-amber-800 mb-1">
+              Previous Sessions (for existing patients only)
+            </label>
+            <input type="number" min="0" value={form.previous_sessions}
+              onChange={e => set('previous_sessions', e.target.value)}
+              placeholder="0"
+              className="w-full border border-amber-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 bg-white" />
+            <p className="text-xs text-amber-600 mt-1">
+              Leave 0 for new patients. Enter total visits before this app was used.
+            </p>
           </div>
         </div>
 

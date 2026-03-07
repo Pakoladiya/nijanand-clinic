@@ -27,7 +27,9 @@ export default function PatientProfile({ patient, onBack }: Props) {
   }
 
   const totalPaid = payments.reduce((s, p) => s + p.amount, 0)
-  const sessionCost = attendance.length * patient.fees_amount
+  const prevSessions = patient.previous_sessions || 0
+  const totalVisits = attendance.length + prevSessions
+  const sessionCost = totalVisits * patient.fees_amount
   const balance = totalPaid - sessionCost
   const isDue = balance < 0
   const isAdvance = balance > 0
@@ -122,8 +124,11 @@ export default function PatientProfile({ patient, onBack }: Props) {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 text-center">
-          <p className="text-2xl font-bold" style={{ color: '#F6A000' }}>{attendance.length}</p>
+          <p className="text-2xl font-bold" style={{ color: '#F6A000' }}>{totalVisits}</p>
           <p className="text-xs text-gray-500 mt-0.5">Total Visits</p>
+          {prevSessions > 0 && (
+            <p className="text-xs text-amber-500 mt-0.5">{attendance.length} recorded</p>
+          )}
         </div>
         <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 text-center">
           <p className="text-2xl font-bold" style={{ color: '#39A900' }}>₹{totalPaid.toLocaleString()}</p>
@@ -145,16 +150,28 @@ export default function PatientProfile({ patient, onBack }: Props) {
             style={tab === t
               ? { backgroundColor: '#F6A000', borderColor: '#F6A000', color: 'white' }
               : { backgroundColor: 'white', borderColor: '#e5e7eb', color: '#374151' }}>
-            {t === 'visits' ? `Visits (${attendance.length})` : 'Fees & Payments'}
+            {t === 'visits' ? `Visits (${totalVisits})` : 'Fees & Payments'}
           </button>
         ))}
       </div>
 
       {/* Visits Tab */}
       {tab === 'visits' && (
+        <div className="space-y-3">
+          {prevSessions > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-2">
+              <span className="text-lg">📋</span>
+              <div>
+                <p className="text-xs font-semibold text-amber-800">{prevSessions} sessions before app</p>
+                <p className="text-xs text-amber-600">Recorded manually at registration</p>
+              </div>
+            </div>
+          )}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           {attendance.length === 0 ? (
-            <p className="text-center text-sm text-gray-400 py-8">No visits recorded yet</p>
+            <p className="text-center text-sm text-gray-400 py-8">
+              {prevSessions > 0 ? 'No sessions recorded via app yet' : 'No visits recorded yet'}
+            </p>
           ) : attendance.map((a, i) => (
             <div key={a.id} className="flex items-center gap-3 px-4 py-3 border-b last:border-0 border-gray-50">
               <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
@@ -176,6 +193,7 @@ export default function PatientProfile({ patient, onBack }: Props) {
               </span>
             </div>
           ))}
+        </div>
         </div>
       )}
 
