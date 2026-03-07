@@ -37,6 +37,7 @@ export default function RegisterPatient() {
   const [photo, setPhoto] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [translitLoading, setTranslitLoading] = useState(false)
+  const [gujaratiConfirmed, setGujaratiConfirmed] = useState(false)
   const translitTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [error, setError] = useState('')
   const [newPatient, setNewPatient] = useState<Patient | null>(null)
@@ -81,6 +82,7 @@ export default function RegisterPatient() {
 
   async function autoTransliterate(englishName: string) {
     setTranslitLoading(true)
+    setGujaratiConfirmed(false) // uncheck — staff must re-verify after auto-fill
     try {
       const words = englishName.split(/\s+/).filter(Boolean)
       const results = await Promise.all(words.map(async (word) => {
@@ -163,6 +165,7 @@ export default function RegisterPatient() {
       setNewPatient(data)
       localStorage.removeItem(DRAFT_KEY)
       setHasDraft(false)
+      setGujaratiConfirmed(false)
       setForm({ name: '', name_gujarati: '', age: '', gender: 'Male', phone: '', address: '',
         referred_by: '', fees_type: 'per_session', fees_amount: '350', previous_sessions: '0' })
       setSelectedComplaints([])
@@ -223,18 +226,48 @@ export default function RegisterPatient() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-2">
-              નામ (ગુજરાતી)
-              <span className="text-gray-400 font-normal">— નિજ-આધાર કાર્ડ માટે</span>
-              {translitLoading && (
-                <span className="text-xs text-orange-500 animate-pulse">⟳ અનુવાદ...</span>
+            <div className="flex items-center justify-between mb-1">
+              <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
+                નામ (ગુજરાતી)
+                {translitLoading && (
+                  <span className="text-orange-500 animate-pulse">⟳ અનુવાદ...</span>
+                )}
+              </label>
+              {/* Verification checkbox — appears once Gujarati field has content */}
+              {form.name_gujarati && !translitLoading && (
+                <label className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer px-2.5 py-1 rounded-lg border transition-colors ${
+                  gujaratiConfirmed
+                    ? 'bg-green-50 border-green-300 text-green-700'
+                    : 'bg-amber-50 border-amber-300 text-amber-700'
+                }`}>
+                  <input
+                    type="checkbox"
+                    checked={gujaratiConfirmed}
+                    onChange={e => setGujaratiConfirmed(e.target.checked)}
+                    className="w-3.5 h-3.5 accent-green-500"
+                  />
+                  {gujaratiConfirmed ? '✓ ચકાસ્યું' : 'ચકાસો'}
+                </label>
               )}
-            </label>
-            <input value={form.name_gujarati} onChange={e => set('name_gujarati', e.target.value)}
+            </div>
+            <input
+              value={form.name_gujarati}
+              onChange={e => { set('name_gujarati', e.target.value); setGujaratiConfirmed(false) }}
               placeholder="નામ આપોઆપ આવશે — જરૂર હોય તો સુધારો"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400"
-              style={{ fontFamily: "'Anek Gujarati', sans-serif" }} />
-            <p className="text-xs text-gray-400 mt-1">✨ અંગ્રેજી નામ ટાઈપ થતાં ગુજરાતી આપોઆપ ભરાશે</p>
+              className={`w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none border transition-colors ${
+                form.name_gujarati && gujaratiConfirmed
+                  ? 'border-green-400 bg-green-50 focus:border-green-500'
+                  : form.name_gujarati && !gujaratiConfirmed
+                  ? 'border-amber-300 focus:border-orange-400'
+                  : 'border-gray-200 focus:border-orange-400'
+              }`}
+              style={{ fontFamily: "'Anek Gujarati', sans-serif" }}
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              {form.name_gujarati && !gujaratiConfirmed
+                ? '⚠️ ગુજરાતી નામ ચકાસીને ✓ ચકાસો પર ટિક કરો'
+                : '✨ અંગ્રેજી નામ ટાઈપ થતાં ગુજરાતી આપોઆપ ભરાશે'}
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
