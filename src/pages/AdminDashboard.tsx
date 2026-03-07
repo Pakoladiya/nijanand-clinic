@@ -2,15 +2,20 @@ import { useState, useEffect } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
-import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield, Eye, EyeOff, Settings } from 'lucide-react'
-import type { Staff, RegisteredDevice, ActivityLog } from '../types'
+import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield, Eye, EyeOff, Settings, Search, Trash2, User } from 'lucide-react'
+import type { Staff, RegisteredDevice, ActivityLog, Patient } from '../types'
 
 export default function AdminDashboard() {
   const { staff } = useAuth()
-  const [tab, setTab] = useState<'staff' | 'devices' | 'activity'>('staff')
+  const [tab, setTab] = useState<'staff' | 'devices' | 'activity' | 'patients'>('staff')
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [devices, setDevices] = useState<RegisteredDevice[]>([])
   const [logs, setLogs] = useState<(ActivityLog & { staff: { name: string } | null })[]>([])
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [patientSearch, setPatientSearch] = useState('')
+  const [patientLoading, setPatientLoading] = useState(false)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
   const [showStaffForm, setShowStaffForm] = useState(false)
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
   const [staffForm, setStaffForm] = useState({ name: '', role: 'staff' as 'admin' | 'staff', username: '', password: '' })
@@ -21,7 +26,8 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (tab === 'staff') loadStaff()
     else if (tab === 'devices') loadDevices()
-    else loadLogs()
+    else if (tab === 'activity') loadLogs()
+    else if (tab === 'patients') loadPatients()
   }, [tab])
 
   useEffect(() => {
@@ -60,6 +66,33 @@ export default function AdminDashboard() {
       .order('created_at', { ascending: false })
       .limit(50)
     setLogs((data as any) || [])
+  }
+
+  async function loadPatients(search = patientSearch) {
+    setPatientLoading(true)
+    let query = supabase.from('patients').select('*').order('created_at', { ascending: false })
+    if (search.trim().length >= 2) {
+      query = query.or(`name.ilike.%${search}%,registration_number.ilike.%${search}%,phone.ilike.%${search}%`)
+    }
+    const { data } = await query.limit(50)
+    setPatients(data || [])
+    setPatientLoading(false)
+  }
+
+  async function deletePatient(patient: Patient) {
+    if (!staff) return
+    setDeleteLoading(true)
+    await supabase.from('attendance').delete().eq('patient_id', patient.id)
+    await supabase.from('payments').delete().eq('patient_id', patient.id)
+    await supabase.from('packages').delete().eq('patient_id', patient.id)
+    if (patient.photo_url) {
+      await supabase.storage.from('patient-photos').remove([`${patient.registration_number}.jpg`])
+    }
+    await supabase.from('patients').delete().eq('id', patient.id)
+    await logActivity(staff.id, 'PATIENT_DELETED', `Deleted patient: ${patient.name} (${patient.registration_number})`)
+    setDeleteLoading(false)
+    setDeleteConfirmId(null)
+    loadPatients()
   }
 
   async function hashPassword(password: string): Promise<string> {
@@ -156,10 +189,10 @@ export default function AdminDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-5">
-        {([['staff', 'Staff', Users], ['devices', 'Devices', Smartphone], ['activity', 'Activity', Activity]] as const).map(([key, label, Icon]) => (
+      <div className="grid grid-cols-4 gap-1.5 mb-5">
+        {([['staff', 'Staff', Users], ['patients', 'Patients', User], ['devices', 'Devices', Smartphone], ['activity', 'Activity', Activity]] as const).map(([key, label, Icon]) => (
           <button key={key} onClick={() => setTab(key as any)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-medium border transition-colors"
+            className="flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-xs font-medium border transition-colors"
             style={tab === key
               ? { backgroundColor: '#39A900', borderColor: '#39A900', color: 'white' }
               : { backgroundColor: 'white', borderColor: '#e5e7eb', color: '#374151' }}>
@@ -258,6 +291,84 @@ export default function AdminDashboard() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Patients Tab */}
+      {tab === 'patients' && (
+        <div className="space-y-3">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-800">
+            <strong>⚠️ Admin Only:</strong> Deleting a patient removes all their visits, payments and records permanently. This cannot be undone.
+          </div>
+
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={patientSearch}
+              onChange={e => {
+                setPatientSearch(e.target.value)
+                loadPatients(e.target.value)
+              }}
+              placeholder="Search by name, NFC no. or phone..."
+              className="w-full pl-9 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-400 bg-white"
+            />
+          </div>
+
+          {patientLoading ? (
+            <div className="text-center py-6 text-gray-400 text-sm">Loading...</div>
+          ) : patients.length === 0 ? (
+            <div className="text-center py-6 text-gray-400 text-sm">
+              {patientSearch.length >= 2 ? 'No patients found' : 'Type to search patients'}
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              {patients.map(p => (
+                <div key={p.id} className="border-b last:border-0 border-gray-50">
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    {p.photo_url ? (
+                      <img src={p.photo_url} alt={p.name}
+                        className="w-10 h-10 rounded-full object-cover flex-shrink-0 border-2 border-gray-100" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold"
+                        style={{ backgroundColor: '#F6A000' }}>
+                        {p.name[0].toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-800 truncate text-sm">{p.name}</p>
+                      <p className="text-xs text-gray-400">{p.registration_number} • {p.age}y, {p.gender}</p>
+                    </div>
+                    <button
+                      onClick={() => setDeleteConfirmId(deleteConfirmId === p.id ? null : p.id)}
+                      className="flex items-center gap-1 text-xs text-red-500 border border-red-200 px-2.5 py-1.5 rounded-xl hover:bg-red-50 flex-shrink-0">
+                      <Trash2 size={12} /> Delete
+                    </button>
+                  </div>
+
+                  {deleteConfirmId === p.id && (
+                    <div className="mx-4 mb-3 bg-red-50 border border-red-200 rounded-xl p-3">
+                      <p className="text-xs font-semibold text-red-700 mb-2">
+                        Delete <strong>{p.name}</strong>? All visits, payments and records will be erased.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => deletePatient(p)}
+                          disabled={deleteLoading}
+                          className="flex-1 py-2 rounded-xl text-white text-xs font-semibold bg-red-500 disabled:opacity-60">
+                          {deleteLoading ? 'Deleting...' : 'Yes, Delete'}
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirmId(null)}
+                          className="flex-1 py-2 rounded-xl text-xs border border-gray-200 text-gray-600 bg-white">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
