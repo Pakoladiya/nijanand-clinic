@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase, generateRegistrationNumber, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import CameraCapture from '../components/CameraCapture'
@@ -36,6 +36,8 @@ export default function RegisterPatient() {
   const [prevSessionsEnabled, setPrevSessionsEnabled] = useState(false)
   const [photo, setPhoto] = useState<string>('')
   const [loading, setLoading] = useState(false)
+  const [translitLoading, setTranslitLoading] = useState(false)
+  const translitTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [error, setError] = useState('')
   const [newPatient, setNewPatient] = useState<Patient | null>(null)
 
@@ -70,6 +72,28 @@ export default function RegisterPatient() {
   function set(field: string, value: string) {
     const processed = TITLE_CASE_FIELDS.includes(field) ? toTitleCase(value) : value
     setForm(f => ({ ...f, [field]: processed }))
+    // Auto-transliterate English name → Gujarati after 600ms pause
+    if (field === 'name' && value.trim().length > 1) {
+      if (translitTimer.current) clearTimeout(translitTimer.current)
+      translitTimer.current = setTimeout(() => autoTransliterate(value.trim()), 600)
+    }
+  }
+
+  async function autoTransliterate(englishName: string) {
+    setTranslitLoading(true)
+    try {
+      const words = englishName.split(/\s+/).filter(Boolean)
+      const results = await Promise.all(words.map(async (word) => {
+        const url = `https://inputtools.google.com/request?text=${encodeURIComponent(word)}&itc=gu-t-i0-und&num=1&cp=0&cs=1&ie=utf-8&oe=utf-8`
+        const res = await fetch(url)
+        const json = await res.json()
+        return json?.[1]?.[0]?.[1]?.[0] ?? word
+      }))
+      setForm(f => ({ ...f, name_gujarati: results.join(' ') }))
+    } catch {
+      // Silently fail — staff can type manually
+    }
+    setTranslitLoading(false)
   }
 
   function toggleComplaint(c: string) {
@@ -199,15 +223,18 @@ export default function RegisterPatient() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
+            <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-2">
               નામ (ગુજરાતી)
-              <span className="text-gray-400 font-normal ml-1">— નિજ-આધાર કાર્ડ માટે</span>
+              <span className="text-gray-400 font-normal">— નિજ-આધાર કાર્ડ માટે</span>
+              {translitLoading && (
+                <span className="text-xs text-orange-500 animate-pulse">⟳ અનુવાદ...</span>
+              )}
             </label>
             <input value={form.name_gujarati} onChange={e => set('name_gujarati', e.target.value)}
-              placeholder="દા.ત. રાજેશ પટેલ"
+              placeholder="નામ આપોઆપ આવશે — જરૂર હોય તો સુધારો"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400"
               style={{ fontFamily: "'Anek Gujarati', sans-serif" }} />
-            <p className="text-xs text-gray-400 mt-1">ગુજરાતી કીબોર્ડ વાપરીને ટાઈપ કરો (વૈકલ્પિક)</p>
+            <p className="text-xs text-gray-400 mt-1">✨ અંગ્રેજી નામ ટાઈપ થતાં ગુજરાતી આપોઆપ ભરાશે</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
