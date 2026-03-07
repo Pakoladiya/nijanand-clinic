@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
-import { ArrowLeft, Phone, MapPin, Calendar, CreditCard, Plus, Download, Package, Trash2 } from 'lucide-react'
+import { ArrowLeft, Phone, MapPin, Calendar, CreditCard, Plus, Download, Package, Trash2, Image } from 'lucide-react'
+import WelcomeImageModal from '../components/WelcomeImageModal'
 import type { Patient, Attendance, Payment } from '../types'
 
 interface Props { patient: Patient; onBack: () => void }
@@ -15,6 +16,7 @@ export default function PatientProfile({ patient, onBack }: Props) {
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [showWelcomeCard, setShowWelcomeCard] = useState(false)
   const [payForm, setPayForm] = useState({ amount: '', type: 'per_session' as Payment['payment_type'], notes: '', date: format(new Date(), 'yyyy-MM-dd'), sessions: '', start_date: format(new Date(), 'yyyy-MM-dd') })
 
   useEffect(() => { loadData() }, [patient.id])
@@ -158,6 +160,14 @@ export default function PatientProfile({ patient, onBack }: Props) {
               </button>
             )}
           </div>
+          <div className="flex items-center gap-2 mt-1">
+            <button onClick={() => setShowWelcomeCard(true)}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border font-medium transition-colors"
+              style={{ borderColor: '#F6A000', color: '#F6A000', backgroundColor: '#FEF3C7' }}>
+              <Image size={12} /> Welcome Card
+            </button>
+            <span className="text-xs text-gray-400">Share / resend anytime</span>
+          </div>
           <div className="flex items-start gap-2 text-sm text-gray-600">
             <MapPin size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
             <span className="text-xs">{patient.address}</span>
@@ -243,6 +253,11 @@ export default function PatientProfile({ patient, onBack }: Props) {
           ))}
         </div>
         </div>
+      )}
+
+      {/* Welcome Card Modal */}
+      {showWelcomeCard && (
+        <WelcomeImageModal patient={patient} onClose={() => setShowWelcomeCard(false)} />
       )}
 
       {/* Fees Tab */}
