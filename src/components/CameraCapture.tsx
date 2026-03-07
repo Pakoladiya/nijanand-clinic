@@ -6,16 +6,43 @@ interface CameraCaptureProps {
   captured: string | null
 }
 
+// Resize & compress image to max 800x800, JPEG quality 0.75
+// This reduces 5MB gallery photos down to ~100-200KB
+function compressImage(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new window.Image()
+    img.onload = () => {
+      const MAX = 800
+      let { width, height } = img
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round((height * MAX) / width); width = MAX }
+        else { width = Math.round((width * MAX) / height); height = MAX }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, width, height)
+      resolve(canvas.toDataURL('image/jpeg', 0.75))
+    }
+    img.onerror = () => resolve(dataUrl) // fallback: use original if error
+    img.src = dataUrl
+  })
+}
+
 export default function CameraCapture({ onCapture, captured }: CameraCaptureProps) {
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = ev => {
-      if (ev.target?.result) onCapture(ev.target.result as string)
+    reader.onload = async (ev) => {
+      if (ev.target?.result) {
+        const compressed = await compressImage(ev.target.result as string)
+        onCapture(compressed)
+      }
     }
     reader.readAsDataURL(file)
     // Reset input so same file can be selected again

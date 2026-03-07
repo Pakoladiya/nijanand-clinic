@@ -69,7 +69,10 @@ export default function RegisterPatient() {
         const { error: uploadError } = await supabase.storage
           .from('patient-photos')
           .upload(fileName, blob, { upsert: true })
-        if (!uploadError) {
+        if (uploadError) {
+          console.error('Photo upload error:', uploadError.message)
+          // Continue registration without photo rather than blocking
+        } else {
           const { data: urlData } = supabase.storage.from('patient-photos').getPublicUrl(fileName)
           photoUrl = urlData.publicUrl
         }
