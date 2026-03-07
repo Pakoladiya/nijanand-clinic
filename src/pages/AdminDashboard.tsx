@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
-import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield, Eye, EyeOff } from 'lucide-react'
+import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield, Eye, EyeOff, Settings } from 'lucide-react'
 import type { Staff, RegisteredDevice, ActivityLog } from '../types'
 
 export default function AdminDashboard() {
@@ -15,12 +15,33 @@ export default function AdminDashboard() {
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
   const [staffForm, setStaffForm] = useState({ name: '', role: 'staff' as 'admin' | 'staff', username: '', password: '' })
   const [showStaffPassword, setShowStaffPassword] = useState(false)
+  const [prevSessionsEnabled, setPrevSessionsEnabled] = useState(false)
+  const [settingsLoading, setSettingsLoading] = useState(false)
 
   useEffect(() => {
     if (tab === 'staff') loadStaff()
     else if (tab === 'devices') loadDevices()
     else loadLogs()
   }, [tab])
+
+  useEffect(() => {
+    loadSettings()
+  }, [])
+
+  async function loadSettings() {
+    const { data } = await supabase.from('clinic_settings').select('value').eq('key', 'previous_sessions_enabled').single()
+    if (data) setPrevSessionsEnabled(data.value === 'true')
+  }
+
+  async function togglePrevSessions() {
+    if (!staff) return
+    setSettingsLoading(true)
+    const newValue = !prevSessionsEnabled
+    await supabase.from('clinic_settings').upsert({ key: 'previous_sessions_enabled', value: String(newValue), updated_at: new Date().toISOString() })
+    await logActivity(staff.id, 'SETTING_CHANGED', `Previous sessions entry ${newValue ? 'enabled' : 'disabled'}`)
+    setPrevSessionsEnabled(newValue)
+    setSettingsLoading(false)
+  }
 
   async function loadStaff() {
     const { data } = await supabase.from('staff').select('*').order('created_at')
@@ -106,6 +127,31 @@ export default function AdminDashboard() {
         <div>
           <h1 className="text-xl font-bold text-gray-800">Admin Dashboard</h1>
           <p className="text-sm text-gray-500">Manage staff, devices & logs</p>
+        </div>
+      </div>
+
+      {/* Feature Settings Card */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Settings size={15} className="text-gray-500" />
+          <p className="text-sm font-semibold text-gray-700">Feature Settings</p>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <p className="text-sm font-medium text-gray-700">Previous Sessions Entry</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {prevSessionsEnabled
+                ? 'ON — Staff can enter unlimited past sessions'
+                : 'OFF — Max 4 past sessions allowed'}
+            </p>
+          </div>
+          <button
+            onClick={togglePrevSessions}
+            disabled={settingsLoading}
+            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${prevSessionsEnabled ? 'bg-green-500' : 'bg-gray-300'} disabled:opacity-50`}
+          >
+            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${prevSessionsEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
         </div>
       </div>
 

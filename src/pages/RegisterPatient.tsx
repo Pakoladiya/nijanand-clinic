@@ -21,6 +21,7 @@ export default function RegisterPatient() {
   const [selectedComplaints, setSelectedComplaints] = useState<string[]>([])
   const [otherComplaint, setOtherComplaint] = useState('')
   const [refSuggestions, setRefSuggestions] = useState<string[]>([])
+  const [prevSessionsEnabled, setPrevSessionsEnabled] = useState(false)
   const [photo, setPhoto] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -33,6 +34,10 @@ export default function RegisterPatient() {
           const unique = [...new Set(data.map((r: any) => r.referred_by).filter(Boolean))] as string[]
           setRefSuggestions(unique)
         }
+      })
+    supabase.from('clinic_settings').select('value').eq('key', 'previous_sessions_enabled').single()
+      .then(({ data }) => {
+        if (data) setPrevSessionsEnabled(data.value === 'true')
       })
   }, [])
 
@@ -206,12 +211,19 @@ export default function RegisterPatient() {
             <label className="block text-xs font-medium text-amber-800 mb-1">
               Previous Sessions (for existing patients only)
             </label>
-            <input type="number" min="0" value={form.previous_sessions}
-              onChange={e => set('previous_sessions', e.target.value)}
+            <input type="number" min="0" max={prevSessionsEnabled ? 9999 : 4}
+              value={form.previous_sessions}
+              onChange={e => {
+                const val = parseInt(e.target.value) || 0
+                const max = prevSessionsEnabled ? 9999 : 4
+                set('previous_sessions', String(Math.min(val, max)))
+              }}
               placeholder="0"
               className="w-full border border-amber-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 bg-white" />
             <p className="text-xs text-amber-600 mt-1">
-              Leave 0 for new patients. Enter total visits before this app was used.
+              {prevSessionsEnabled
+                ? 'Feature ON — Enter any number of past sessions.'
+                : 'Max 4 sessions. Admin can enable unlimited entry in Admin panel.'}
             </p>
           </div>
         </div>
