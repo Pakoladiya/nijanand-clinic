@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
-import { ArrowLeft, Phone, MapPin, Calendar, CreditCard, Plus, Download, Package } from 'lucide-react'
+import { ArrowLeft, Phone, MapPin, Calendar, CreditCard, Plus, Download, Package, Trash2 } from 'lucide-react'
 import type { Patient, Attendance, Payment } from '../types'
 
 interface Props { patient: Patient; onBack: () => void }
@@ -13,6 +13,8 @@ export default function PatientProfile({ patient, onBack }: Props) {
   const [payments, setPayments] = useState<Payment[]>([])
   const [tab, setTab] = useState<'visits' | 'fees'>('visits')
   const [showPaymentForm, setShowPaymentForm] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
   const [payForm, setPayForm] = useState({ amount: '', type: 'per_session' as Payment['payment_type'], notes: '', date: format(new Date(), 'yyyy-MM-dd'), sessions: '', start_date: format(new Date(), 'yyyy-MM-dd') })
 
   useEffect(() => { loadData() }, [patient.id])
@@ -68,13 +70,59 @@ export default function PatientProfile({ patient, onBack }: Props) {
     link.click()
   }
 
+  async function deletePatient() {
+    if (!staff) return
+    setDeleteLoading(true)
+    // Delete attendance, payments, then patient
+    await supabase.from('attendance').delete().eq('patient_id', patient.id)
+    await supabase.from('payments').delete().eq('patient_id', patient.id)
+    await supabase.from('packages').delete().eq('patient_id', patient.id)
+    // Delete photo from storage if exists
+    if (patient.photo_url) {
+      const fileName = `${patient.registration_number}.jpg`
+      await supabase.storage.from('patient-photos').remove([fileName])
+    }
+    await supabase.from('patients').delete().eq('id', patient.id)
+    await logActivity(staff.id, 'PATIENT_DELETED', `Deleted patient: ${patient.name} (${patient.registration_number})`)
+    setDeleteLoading(false)
+    onBack()
+  }
+
   const maskPhone = (phone: string) => staff?.role === 'admin' ? phone : phone.slice(0, 5) + ' *****'
 
   return (
     <div className="max-w-lg mx-auto pb-8">
-      <button onClick={onBack} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-4">
-        <ArrowLeft size={16} /> Back to Patients
-      </button>
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={onBack} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
+          <ArrowLeft size={16} /> Back to Patients
+        </button>
+        {staff?.role === 'admin' && (
+          <button onClick={() => setShowDeleteConfirm(true)}
+            className="flex items-center gap-1.5 text-xs text-red-500 border border-red-200 px-3 py-1.5 rounded-xl hover:bg-red-50 transition-colors">
+            <Trash2 size={13} /> Delete Patient
+          </button>
+        )}
+      </div>
+
+      {/* Delete Confirmation */}
+      {showDeleteConfirm && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
+          <p className="text-sm font-semibold text-red-700 mb-1">⚠️ Delete Patient?</p>
+          <p className="text-xs text-red-600 mb-3">
+            This will permanently delete <strong>{patient.name}</strong> and all their visits, payments and records. This cannot be undone.
+          </p>
+          <div className="flex gap-2">
+            <button onClick={deletePatient} disabled={deleteLoading}
+              className="flex-1 py-2 rounded-xl text-white text-sm font-semibold bg-red-500 disabled:opacity-60">
+              {deleteLoading ? 'Deleting...' : 'Yes, Delete'}
+            </button>
+            <button onClick={() => setShowDeleteConfirm(false)}
+              className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600 bg-white">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">

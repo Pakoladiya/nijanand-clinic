@@ -9,23 +9,37 @@ import type { Patient } from '../types'
 const COMPLAINTS = ['Back Pain', 'Neck Pain', 'Knee Pain', 'Shoulder Pain', 'Hip Pain',
   'Ankle Pain', 'Wrist Pain', 'Elbow Pain', 'Sports Injury', 'Post-Surgery Rehab', 'Other']
 
+const DRAFT_KEY = 'nfc_registration_draft'
+
 export default function RegisterPatient() {
   const { staff } = useAuth()
-  const [form, setForm] = useState({
+
+  // Restore draft from localStorage on first load
+  const savedDraft = (() => { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null') } catch { return null } })()
+
+  const [form, setForm] = useState(savedDraft?.form ?? {
     name: '', age: '', gender: 'Male' as 'Male' | 'Female' | 'Other',
     phone: '', address: '', referred_by: '',
     fees_type: 'per_session' as 'per_session' | 'package',
     fees_amount: '350',
     previous_sessions: '0',
   })
-  const [selectedComplaints, setSelectedComplaints] = useState<string[]>([])
-  const [otherComplaint, setOtherComplaint] = useState('')
+  const [selectedComplaints, setSelectedComplaints] = useState<string[]>(savedDraft?.selectedComplaints ?? [])
+  const [otherComplaint, setOtherComplaint] = useState(savedDraft?.otherComplaint ?? '')
+  const [hasDraft, setHasDraft] = useState(!!savedDraft)
   const [refSuggestions, setRefSuggestions] = useState<string[]>([])
   const [prevSessionsEnabled, setPrevSessionsEnabled] = useState(false)
   const [photo, setPhoto] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [newPatient, setNewPatient] = useState<Patient | null>(null)
+
+  // Auto-save form to localStorage on every change
+  useEffect(() => {
+    const isEmpty = !form.name && !form.phone && !form.age
+    if (isEmpty) return
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, selectedComplaints, otherComplaint }))
+  }, [form, selectedComplaints, otherComplaint])
 
   useEffect(() => {
     supabase.from('patients').select('referred_by').not('referred_by', 'is', null)
@@ -109,6 +123,8 @@ export default function RegisterPatient() {
         `Registered new patient: ${form.name} (${regNo})`)
 
       setNewPatient(data)
+      localStorage.removeItem(DRAFT_KEY)
+      setHasDraft(false)
       setForm({ name: '', age: '', gender: 'Male', phone: '', address: '',
         referred_by: '', fees_type: 'per_session', fees_amount: '350', previous_sessions: '0' })
       setSelectedComplaints([])
@@ -132,6 +148,22 @@ export default function RegisterPatient() {
           <p className="text-sm text-gray-500">Nijanand Fitness Centre</p>
         </div>
       </div>
+
+      {hasDraft && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-base">📝</span>
+            <p className="text-xs font-medium text-blue-700">Draft restored — your previous data is back!</p>
+          </div>
+          <button type="button" onClick={() => {
+            localStorage.removeItem(DRAFT_KEY)
+            setHasDraft(false)
+            setForm({ name: '', age: '', gender: 'Male', phone: '', address: '', referred_by: '', fees_type: 'per_session', fees_amount: '350', previous_sessions: '0' })
+            setSelectedComplaints([])
+            setOtherComplaint('')
+          }} className="text-xs text-blue-500 underline ml-2">Clear</button>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Photo */}
