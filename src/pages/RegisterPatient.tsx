@@ -51,6 +51,7 @@ export default function RegisterPatient() {
     const complaints = selectedComplaints.includes('Other')
       ? [...selectedComplaints.filter(c => c !== 'Other'), otherComplaint.trim()].filter(Boolean)
       : selectedComplaints
+    if (form.phone.length !== 10) { setError('Please enter a valid 10-digit mobile number.'); return }
     if (complaints.length === 0) { setError('Please select at least one chief complaint.'); return }
     setLoading(true)
     setError('')
@@ -162,10 +163,20 @@ export default function RegisterPatient() {
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Phone Number *</label>
-            <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)}
+            <input type="tel" value={form.phone}
+              onChange={e => { const v = e.target.value.replace(/\D/g, '').slice(0, 10); set('phone', v) }}
               placeholder="10-digit mobile number"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400"
+              className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none transition-colors ${
+                form.phone.length > 0 && form.phone.length !== 10
+                  ? 'border-red-400 focus:border-red-400'
+                  : 'border-gray-200 focus:border-orange-400'
+              }`}
               required />
+            {form.phone.length > 0 && form.phone.length !== 10 && (
+              <p className="text-red-500 text-xs mt-1">
+                {form.phone.length < 10 ? `${10 - form.phone.length} more digits needed` : 'Only 10 digits allowed'}
+              </p>
+            )}
           </div>
 
           <div>
