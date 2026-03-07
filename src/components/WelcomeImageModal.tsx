@@ -11,13 +11,10 @@ export default function WelcomeImageModal({ patient, onClose }: Props) {
   async function downloadImage() {
     if (!cardRef.current) return
     const canvas = await html2canvas(cardRef.current, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: null,
-      allowTaint: true,
+      scale: 2, useCORS: true, backgroundColor: null, allowTaint: true,
     })
     const link = document.createElement('a')
-    link.download = `Welcome-${patient.registration_number}.jpg`
+    link.download = `NijAadhaar-${patient.registration_number}.jpg`
     link.href = canvas.toDataURL('image/jpeg', 0.95)
     link.click()
   }
@@ -25,16 +22,13 @@ export default function WelcomeImageModal({ patient, onClose }: Props) {
   async function shareImage() {
     if (!cardRef.current) return
     const canvas = await html2canvas(cardRef.current, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: null,
-      allowTaint: true,
+      scale: 2, useCORS: true, backgroundColor: null, allowTaint: true,
     })
     canvas.toBlob(async (blob) => {
       if (!blob) return
-      const file = new File([blob], `Welcome-${patient.registration_number}.jpg`, { type: 'image/jpeg' })
+      const file = new File([blob], `NijAadhaar-${patient.registration_number}.jpg`, { type: 'image/jpeg' })
       if (navigator.share && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'NFC સ્વાગત કાર્ડ' })
+        await navigator.share({ files: [file], title: 'નિજ-આધાર કાર્ડ' })
       } else {
         downloadImage()
       }
@@ -46,116 +40,192 @@ export default function WelcomeImageModal({ patient, onClose }: Props) {
     : `₹${patient.fees_amount} (પેકેજ)`
 
   const gujFont = "'Anek Gujarati', Arial, sans-serif"
+  const issueDate = new Date(patient.created_at)
+    .toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' })
+
+  const genderGuj = patient.gender === 'Male' ? 'પુરૂષ' : patient.gender === 'Female' ? 'સ્ત્રી' : 'અન્ય'
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h3 className="font-bold text-gray-800">સ્વાગત કાર્ડ તૈયાર છે</h3>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+          <h3 className="font-bold text-gray-800 text-sm">નિજ-આધાર કાર્ડ તૈયાર છે</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={20} />
           </button>
         </div>
 
-        {/* Welcome Card — rendered to image */}
-        <div className="p-4 bg-gray-50">
+        {/* Card Preview */}
+        <div className="p-4 bg-gray-100">
           <div ref={cardRef} style={{
-            background: 'linear-gradient(145deg, #fff8ed 0%, #f0fce8 100%)',
             fontFamily: gujFont,
-            borderRadius: 16,
+            borderRadius: 10,
             overflow: 'hidden',
+            border: '1.5px solid #d1d5db',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            background: 'white',
           }}>
 
-            {/* Card Header with logo */}
-            <div style={{ background: 'linear-gradient(135deg, #F6A000, #e09000)', padding: '18px 22px 14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <img
-                  src="/logo.png"
-                  alt="Nijanand Logo"
-                  crossOrigin="anonymous"
-                  style={{ width: 52, height: 52, borderRadius: '50%', background: 'white',
-                    objectFit: 'cover', flexShrink: 0, padding: 3 }}
-                />
+            {/* ── Orange Header (like Aadhaar saffron top) ── */}
+            <div style={{
+              background: 'linear-gradient(135deg, #F6A000 0%, #e08800 100%)',
+              padding: '10px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              {/* Left: Logo + Clinic name */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <img src="/logo.png" alt="Logo" crossOrigin="anonymous"
+                  style={{ width: 38, height: 38, borderRadius: '50%', background: 'white',
+                    objectFit: 'cover', padding: 2, flexShrink: 0,
+                    border: '2px solid rgba(255,255,255,0.6)' }} />
                 <div>
-                  <p style={{ color: 'white', fontWeight: 'bold', fontSize: 18, margin: 0, lineHeight: 1.2,
-                    fontFamily: gujFont }}>
-                    નિજાનંદ
+                  <p style={{ color: 'white', fontWeight: 'bold', fontSize: 13, margin: 0,
+                    fontFamily: gujFont, lineHeight: 1.2 }}>
+                    નિજાનંદ ફિટનેસ સેન્ટર
                   </p>
-                  <p style={{ color: 'rgba(255,255,255,0.92)', fontWeight: '600', fontSize: 13, margin: 0,
-                    fontFamily: gujFont }}>
-                    ફિટનેસ સેન્ટર
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Card Body */}
-            <div style={{ padding: '18px 22px' }}>
-
-              <p style={{ color: '#6b7280', fontSize: 12, margin: '0 0 3px 0', fontFamily: gujFont }}>
-                NFC પરિવારમાં આપનું સ્વાગત છે! 🎉
-              </p>
-              <h2 style={{ color: '#1f2937', fontWeight: 'bold', fontSize: 19, margin: '0 0 14px 0',
-                fontFamily: gujFont }}>
-                પ્રિય {patient.name},
-              </h2>
-
-              {/* Registration Number Box */}
-              <div style={{
-                background: 'white', borderRadius: 12, padding: '14px 18px',
-                border: '2px solid #F6A000', marginBottom: 14,
-                boxShadow: '0 2px 8px rgba(246,160,0,0.15)'
-              }}>
-                <p style={{ color: '#6b7280', fontSize: 10, margin: '0 0 4px 0',
-                  textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: gujFont }}>
-                  આપનો નોંધણી નંબર
-                </p>
-                <p style={{ color: '#F6A000', fontWeight: 'bold', fontSize: 22, margin: 0,
-                  letterSpacing: '0.05em', fontFamily: "'Arial', sans-serif" }}>
-                  {patient.registration_number}
-                </p>
-              </div>
-
-              {/* Fees */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                background: '#f0fce8', borderRadius: 10, padding: '10px 14px', marginBottom: 14
-              }}>
-                <span style={{ fontSize: 16 }}>💰</span>
-                <div>
-                  <p style={{ color: '#6b7280', fontSize: 10, margin: 0, fontFamily: gujFont }}>સત્ર ફી</p>
-                  <p style={{ color: '#39A900', fontWeight: 'bold', fontSize: 14, margin: 0, fontFamily: gujFont }}>
-                    {feesText}
+                  <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 9, margin: 0,
+                    fontFamily: "'Arial', sans-serif", letterSpacing: '0.3px' }}>
+                    Nijanand Fitness Centre
                   </p>
                 </div>
               </div>
 
-              <p style={{ color: '#6b7280', fontSize: 11, margin: '0 0 14px 0', lineHeight: 1.6,
-                fontFamily: gujFont }}>
-                ભવિષ્યની તમામ મુલાકાત માટે આ નોંધણી નંબર સાચવો.
-                આપની આરોગ્યયાત્રામાં સહાય કરવા અમે સદૈવ તત્પર છીએ.
-              </p>
-
-              {/* Footer */}
-              <div style={{
-                borderTop: '1px solid #e5e7eb', paddingTop: 10,
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-              }}>
-                <p style={{ color: '#39A900', fontWeight: 'bold', fontSize: 11, margin: 0, fontFamily: gujFont }}>
-                  ચળવળ એ દવા છે 💪
+              {/* Right: Nij-Aadhaar branding */}
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ color: 'white', fontWeight: 'bold', fontSize: 18, margin: 0,
+                  fontFamily: gujFont, lineHeight: 1.1 }}>
+                  નિજ-આધાર
                 </p>
-                <p style={{ color: '#9ca3af', fontSize: 11, margin: 0, fontFamily: "'Arial', sans-serif" }}>
-                  📞 63551 08454
+                <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 9, margin: 0,
+                  fontFamily: "'Arial', sans-serif", letterSpacing: '1.5px', fontWeight: '600' }}>
+                  NIJ-AADHAAR
                 </p>
               </div>
             </div>
+
+            {/* ── White Card Body ── */}
+            <div style={{ display: 'flex', padding: '12px 14px', gap: 12,
+              background: 'linear-gradient(160deg, #fffdf8 0%, #f8fff4 100%)' }}>
+
+              {/* Left column: Photo */}
+              <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+                {patient.photo_url ? (
+                  <img src={patient.photo_url} alt={patient.name} crossOrigin="anonymous"
+                    style={{ width: 76, height: 90, objectFit: 'cover', borderRadius: 8,
+                      border: '2.5px solid #F6A000',
+                      boxShadow: '0 2px 8px rgba(246,160,0,0.3)' }} />
+                ) : (
+                  <div style={{ width: 76, height: 90, borderRadius: 8,
+                    background: 'linear-gradient(135deg, #F6A000, #e08800)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: '2.5px solid #F6A000', color: 'white', fontWeight: 'bold',
+                    fontSize: 30, fontFamily: gujFont,
+                    boxShadow: '0 2px 8px rgba(246,160,0,0.3)' }}>
+                    {patient.name[0].toUpperCase()}
+                  </div>
+                )}
+                {/* Small decorative dots like Aadhaar pattern */}
+                <div style={{ display: 'flex', gap: 3 }}>
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} style={{ width: 5, height: 5, borderRadius: '50%',
+                      background: i % 2 === 0 ? '#F6A000' : '#39A900' }} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Right column: Patient details */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+
+                {/* Name */}
+                <p style={{ color: '#111827', fontWeight: 'bold', fontSize: 17, margin: '0 0 7px 0',
+                  fontFamily: gujFont, lineHeight: 1.2, borderBottom: '1px solid #f3f4f6',
+                  paddingBottom: 6 }}>
+                  {patient.name}
+                </p>
+
+                {/* Age / Gender / Date row */}
+                <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                  <div>
+                    <p style={{ color: '#9ca3af', fontSize: 8, margin: '0 0 1px 0', fontFamily: gujFont,
+                      textTransform: 'uppercase', letterSpacing: '0.3px' }}>ઉંમર</p>
+                    <p style={{ color: '#1f2937', fontSize: 13, fontWeight: '700', margin: 0,
+                      fontFamily: gujFont }}>
+                      {patient.age} વર્ષ
+                    </p>
+                  </div>
+                  <div style={{ width: 1, background: '#e5e7eb' }} />
+                  <div>
+                    <p style={{ color: '#9ca3af', fontSize: 8, margin: '0 0 1px 0', fontFamily: gujFont,
+                      textTransform: 'uppercase', letterSpacing: '0.3px' }}>જાતિ</p>
+                    <p style={{ color: '#1f2937', fontSize: 13, fontWeight: '700', margin: 0,
+                      fontFamily: gujFont }}>
+                      {genderGuj}
+                    </p>
+                  </div>
+                  <div style={{ width: 1, background: '#e5e7eb' }} />
+                  <div>
+                    <p style={{ color: '#9ca3af', fontSize: 8, margin: '0 0 1px 0', fontFamily: gujFont,
+                      textTransform: 'uppercase', letterSpacing: '0.3px' }}>નોંધ તા.</p>
+                    <p style={{ color: '#1f2937', fontSize: 11, fontWeight: '700', margin: 0,
+                      fontFamily: "'Arial', sans-serif" }}>
+                      {issueDate}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Registration Number — big like Aadhaar's 12-digit */}
+                <div style={{ background: 'white', borderRadius: 7, padding: '6px 10px',
+                  border: '1.5px solid #F6A000', marginBottom: 6,
+                  boxShadow: '0 1px 6px rgba(246,160,0,0.15)' }}>
+                  <p style={{ color: '#92400e', fontSize: 8, margin: '0 0 2px 0', fontFamily: gujFont,
+                    letterSpacing: '0.4px', textTransform: 'uppercase' }}>
+                    નોંધણી નંબર / Registration No.
+                  </p>
+                  <p style={{ color: '#F6A000', fontWeight: 'bold', fontSize: 20, margin: 0,
+                    letterSpacing: '2px', fontFamily: "'Arial', sans-serif", lineHeight: 1 }}>
+                    {patient.registration_number}
+                  </p>
+                </div>
+
+                {/* Chief complaint */}
+                <p style={{ color: '#6b7280', fontSize: 9, margin: 0, fontFamily: gujFont }}>
+                  🩺 {patient.chief_complaint}
+                </p>
+              </div>
+            </div>
+
+            {/* ── Green Footer (like Aadhaar blue bottom) ── */}
+            <div style={{
+              background: 'linear-gradient(135deg, #39A900 0%, #2d8700 100%)',
+              padding: '7px 14px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+              <p style={{ color: 'white', fontSize: 10, fontWeight: 'bold', margin: 0, fontFamily: gujFont }}>
+                💰 {feesText}
+              </p>
+              <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.3)' }} />
+              <p style={{ color: 'rgba(255,255,255,0.95)', fontSize: 10, fontWeight: '600', margin: 0,
+                fontFamily: gujFont }}>
+                ચળવળ એ દવા છે 💪
+              </p>
+              <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.3)' }} />
+              <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: 10, margin: 0,
+                fontFamily: "'Arial', sans-serif" }}>
+                📞 63551 08454
+              </p>
+            </div>
+
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-3 px-5 pb-5">
+        <div className="flex gap-3 px-4 pb-4">
           <button onClick={downloadImage}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold"
             style={{ backgroundColor: '#39A900' }}>
