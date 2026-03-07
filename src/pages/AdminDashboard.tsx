@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
-import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield } from 'lucide-react'
+import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield, Eye, EyeOff } from 'lucide-react'
 import type { Staff, RegisteredDevice, ActivityLog } from '../types'
 
 export default function AdminDashboard() {
@@ -14,6 +14,7 @@ export default function AdminDashboard() {
   const [showStaffForm, setShowStaffForm] = useState(false)
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
   const [staffForm, setStaffForm] = useState({ name: '', role: 'staff' as 'admin' | 'staff', username: '', password: '' })
+  const [showStaffPassword, setShowStaffPassword] = useState(false)
 
   useEffect(() => {
     if (tab === 'staff') loadStaff()
@@ -63,6 +64,7 @@ export default function AdminDashboard() {
     setShowStaffForm(false)
     setEditingStaff(null)
     setStaffForm({ name: '', role: 'staff', username: '', password: '' })
+    setShowStaffPassword(false)
     loadStaff()
   }
 
@@ -81,6 +83,7 @@ export default function AdminDashboard() {
   function startEdit(s: Staff) {
     setEditingStaff(s)
     setStaffForm({ name: s.name, role: s.role, username: s.username, password: '' })
+    setShowStaffPassword(false)
     setShowStaffForm(true)
   }
 
@@ -122,7 +125,7 @@ export default function AdminDashboard() {
       {/* Staff Tab */}
       {tab === 'staff' && (
         <div className="space-y-3">
-          <button onClick={() => { setShowStaffForm(true); setEditingStaff(null); setStaffForm({ name: '', role: 'staff', username: '', password: '' }) }}
+          <button onClick={() => { setShowStaffForm(true); setEditingStaff(null); setStaffForm({ name: '', role: 'staff', username: '', password: '' }); setShowStaffPassword(false) }}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold"
             style={{ backgroundColor: '#F6A000' }}>
             <Plus size={16} /> Add New Staff
@@ -157,10 +160,20 @@ export default function AdminDashboard() {
                 <label className="block text-xs text-gray-500 mb-1">
                   Password {editingStaff ? '(leave blank to keep current)' : '*'}
                 </label>
-                <input type="password" value={staffForm.password}
-                  onChange={e => setStaffForm(f => ({ ...f, password: e.target.value }))}
-                  placeholder="••••••••"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
+                <div className="relative">
+                  <input type={showStaffPassword ? 'text' : 'password'} value={staffForm.password}
+                    onChange={e => setStaffForm(f => ({ ...f, password: e.target.value }))}
+                    placeholder="••••••••"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 pr-10 text-sm focus:outline-none focus:border-orange-400" />
+                  <button
+                    type="button"
+                    onClick={() => setShowStaffPassword(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showStaffPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
               <div className="flex gap-2">
                 <button onClick={saveStaff}
@@ -168,7 +181,7 @@ export default function AdminDashboard() {
                   style={{ backgroundColor: '#39A900' }}>
                   {editingStaff ? 'Update' : 'Add Staff'}
                 </button>
-                <button onClick={() => { setShowStaffForm(false); setEditingStaff(null) }}
+                <button onClick={() => { setShowStaffForm(false); setEditingStaff(null); setShowStaffPassword(false) }}
                   className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600">
                   Cancel
                 </button>
