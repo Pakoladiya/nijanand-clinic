@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
-import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield, Eye, EyeOff, Settings, Search, Trash2, User } from 'lucide-react'
+import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield, Eye, EyeOff, Settings, Search, Trash2, User, Clock } from 'lucide-react'
 import type { Staff, RegisteredDevice, ActivityLog, Patient } from '../types'
 
 export default function AdminDashboard() {
@@ -22,6 +22,8 @@ export default function AdminDashboard() {
   const [showStaffPassword, setShowStaffPassword] = useState(false)
   const [prevSessionsEnabled, setPrevSessionsEnabled] = useState(false)
   const [settingsLoading, setSettingsLoading] = useState(false)
+  const [editingTimeStaff, setEditingTimeStaff] = useState<string | null>(null)
+  const [timeForm, setTimeForm] = useState({ start: '', end: '' })
 
   useEffect(() => {
     if (tab === 'staff') loadStaff()
@@ -134,11 +136,35 @@ export default function AdminDashboard() {
     loadDevices()
   }
 
+  function fmtTime(t: string) {
+    const [h, m] = t.split(':').map(Number)
+    const ampm = h >= 12 ? 'PM' : 'AM'
+    return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${ampm}`
+  }
+
+  async function saveTimeRestriction(staffId: string) {
+    await supabase.from('staff').update({
+      login_start: timeForm.start || null,
+      login_end: timeForm.end || null,
+    }).eq('id', staffId)
+    await logActivity(staff!.id, 'STAFF_TIME_UPDATED', `Updated login time for staff`)
+    setEditingTimeStaff(null)
+    loadStaff()
+  }
+
+  async function clearTimeRestriction(staffId: string, staffName: string) {
+    await supabase.from('staff').update({ login_start: null, login_end: null }).eq('id', staffId)
+    await logActivity(staff!.id, 'STAFF_TIME_UPDATED', `Removed login time restriction for ${staffName}`)
+    setEditingTimeStaff(null)
+    loadStaff()
+  }
+
   function startEdit(s: Staff) {
     setEditingStaff(s)
     setStaffForm({ name: s.name, role: s.role, username: s.username, password: '' })
     setShowStaffPassword(false)
     setShowStaffForm(true)
+    setEditingTimeStaff(null)
   }
 
   if (staff?.role !== 'admin') {
@@ -270,24 +296,89 @@ export default function AdminDashboard() {
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             {staffList.map(s => (
-              <div key={s.id} className="flex items-center gap-3 px-4 py-3 border-b last:border-0 border-gray-50">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
-                  style={{ backgroundColor: s.role === 'admin' ? '#39A900' : '#F6A000' }}>
-                  {s.name[0]}
+              <div key={s.id} className="border-b last:border-0 border-gray-50">
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                    style={{ backgroundColor: s.role === 'admin' ? '#39A900' : '#F6A000' }}>
+                    {s.name[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{s.name}</p>
+                    <p className="text-xs text-gray-400">@{s.username} • {s.role}</p>
+                    {s.login_start && s.login_end && (
+                      <p className="text-xs text-blue-500 mt-0.5">
+                        ⏰ {fmtTime(s.login_start)} – {fmtTime(s.login_end)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => startEdit(s)} className="p-1.5 text-gray-400 hover:text-blue-500">
+                      <Edit2 size={14} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (editingTimeStaff === s.id) { setEditingTimeStaff(null); return }
+                        setTimeForm({ start: s.login_start?.slice(0, 5) ?? '', end: s.login_end?.slice(0, 5) ?? '' })
+                        setEditingTimeStaff(s.id)
+                        setShowStaffForm(false)
+                      }}
+                      className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                        s.login_start
+                          ? 'text-blue-600 border-blue-200 bg-blue-50'
+                          : 'text-gray-500 border-gray-200 bg-gray-50'
+                      }`}
+                      title="Login time restriction">
+                      <Clock size={12} />
+                      <span>Time</span>
+                    </button>
+                    <button onClick={() => toggleStaffActive(s)}
+                      className={`p-1.5 ${s.is_active ? 'text-green-500' : 'text-gray-300'}`}>
+                      {s.is_active ? <CheckCircle size={16} /> : <XCircle size={16} />}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 truncate">{s.name}</p>
-                  <p className="text-xs text-gray-400">@{s.username} • {s.role}</p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => startEdit(s)} className="p-1.5 text-gray-400 hover:text-blue-500">
-                    <Edit2 size={14} />
-                  </button>
-                  <button onClick={() => toggleStaffActive(s)}
-                    className={`p-1.5 ${s.is_active ? 'text-green-500' : 'text-gray-300'}`}>
-                    {s.is_active ? <CheckCircle size={16} /> : <XCircle size={16} />}
-                  </button>
-                </div>
+
+                {editingTimeStaff === s.id && (
+                  <div className="mx-4 mb-3 bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2">
+                    <p className="text-xs font-semibold text-blue-700">
+                      Login Time Window — {s.name}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">From</label>
+                        <input type="time" value={timeForm.start}
+                          onChange={e => setTimeForm(f => ({ ...f, start: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-blue-400 bg-white" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">To</label>
+                        <input type="time" value={timeForm.end}
+                          onChange={e => setTimeForm(f => ({ ...f, end: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-blue-400 bg-white" />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => saveTimeRestriction(s.id)}
+                        disabled={!timeForm.start || !timeForm.end}
+                        className="flex-1 py-1.5 rounded-lg text-white text-xs font-semibold bg-blue-500 disabled:opacity-50">
+                        Save
+                      </button>
+                      {s.login_start && (
+                        <button
+                          onClick={() => clearTimeRestriction(s.id, s.name)}
+                          className="flex-1 py-1.5 rounded-lg text-xs border border-red-200 text-red-500 bg-white">
+                          Remove
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setEditingTimeStaff(null)}
+                        className="flex-1 py-1.5 rounded-lg text-xs border border-gray-200 text-gray-500 bg-white">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

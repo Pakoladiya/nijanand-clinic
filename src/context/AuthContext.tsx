@@ -43,6 +43,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error || !data) return { error: 'Invalid username or password' }
 
+    // Time-based login restriction (admins are exempt)
+    if (data.role !== 'admin' && data.login_start && data.login_end) {
+      const now = new Date()
+      const cur = now.getHours() * 60 + now.getMinutes()
+      const [sh, sm] = data.login_start.split(':').map(Number)
+      const [eh, em] = data.login_end.split(':').map(Number)
+      const start = sh * 60 + sm
+      const end = eh * 60 + em
+      const fmt = (t: string) => {
+        const [h, m] = t.split(':').map(Number)
+        const ampm = h >= 12 ? 'PM' : 'AM'
+        return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${ampm}`
+      }
+      if (cur < start || cur > end) {
+        return { error: `Login allowed only between ${fmt(data.login_start)} and ${fmt(data.login_end)}` }
+      }
+    }
+
     setStaff(data)
     localStorage.setItem('nfc_staff', JSON.stringify(data))
 

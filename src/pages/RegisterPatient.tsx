@@ -228,9 +228,9 @@ export default function RegisterPatient() {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
-                નામ (ગુજરાતી)
+                Name (Gujarati)
                 {translitLoading && (
-                  <span className="text-orange-500 animate-pulse">⟳ અનુવાદ...</span>
+                  <span className="text-orange-500 animate-pulse">⟳ Translating...</span>
                 )}
               </label>
               {/* Verification checkbox — appears once Gujarati field has content */}
@@ -246,14 +246,18 @@ export default function RegisterPatient() {
                     onChange={e => setGujaratiConfirmed(e.target.checked)}
                     className="w-3.5 h-3.5 accent-green-500"
                   />
-                  {gujaratiConfirmed ? '✓ ચકાસ્યું' : 'ચકાસો'}
+                  {gujaratiConfirmed ? '✓ Verified' : 'Verify'}
                 </label>
               )}
             </div>
             <input
               value={form.name_gujarati}
               onChange={e => { set('name_gujarati', e.target.value); setGujaratiConfirmed(false) }}
-              placeholder="નામ આપોઆપ આવશે — જરૂર હોય તો સુધારો"
+              placeholder="Auto-filled in Gujarati — edit if needed"
+              lang="gu"
+              inputMode="text"
+              autoCorrect="off"
+              autoComplete="off"
               className={`w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none border transition-colors ${
                 form.name_gujarati && gujaratiConfirmed
                   ? 'border-green-400 bg-green-50 focus:border-green-500'
@@ -263,11 +267,6 @@ export default function RegisterPatient() {
               }`}
               style={{ fontFamily: "'Anek Gujarati', sans-serif" }}
             />
-            <p className="text-xs text-gray-400 mt-1">
-              {form.name_gujarati && !gujaratiConfirmed
-                ? '⚠️ ગુજરાતી નામ ચકાસીને ✓ ચકાસો પર ટિક કરો'
-                : '✨ અંગ્રેજી નામ ટાઈપ થતાં ગુજરાતી આપોઆપ ભરાશે'}
-            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

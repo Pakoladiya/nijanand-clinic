@@ -9,6 +9,8 @@ export interface Staff {
   role: Role
   username: string
   is_active: boolean
+  login_start: string | null  // 'HH:MM:SS' or null = no restriction
+  login_end: string | null    // 'HH:MM:SS' or null = no restriction
   created_at: string
 }
 

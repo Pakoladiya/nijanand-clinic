@@ -13,18 +13,23 @@ export async function generateRegistrationNumber(): Promise<string> {
   const yy = String(now.getFullYear()).slice(-2)
   const datePrefix = `NFC-${dd}${mm}${yy}`
 
-  // Count patients registered today
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
-  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
-
-  const { count } = await supabase
+  // Fetch all of today's registration numbers and find the true numeric max
+  // (string sort fails at boundaries like 009 > 010 alphabetically)
+  const { data } = await supabase
     .from('patients')
-    .select('*', { count: 'exact', head: true })
-    .gte('created_at', startOfDay)
-    .lt('created_at', endOfDay)
+    .select('registration_number')
+    .like('registration_number', `${datePrefix}-%`)
 
-  const seq = String((count || 0) + 1).padStart(3, '0')
-  return `${datePrefix}-${seq}`
+  let seq = 1
+  if (data && data.length > 0) {
+    const maxSeq = Math.max(...data.map(p => {
+      const parts = p.registration_number.split('-')
+      return parseInt(parts[parts.length - 1] || '0')
+    }))
+    seq = maxSeq + 1
+  }
+
+  return `${datePrefix}-${String(seq).padStart(3, '0')}`
 }
 
 // Log activity
