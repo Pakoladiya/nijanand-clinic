@@ -160,11 +160,24 @@ export default function WelcomeImageModal({ patient, onClose }: Props) {
               <div style={{ flex: 1, minWidth: 0 }}>
 
                 {/* Name */}
-                <p style={{ color: '#111827', fontWeight: 'bold', fontSize: 17, margin: '0 0 7px 0',
-                  fontFamily: gujFont, lineHeight: 1.2, borderBottom: '1px solid #f3f4f6',
-                  paddingBottom: 6 }}>
-                  {patient.name}
-                </p>
+                {patient.name_gujarati ? (
+                  <div style={{ marginBottom: 7, borderBottom: '1px solid #f3f4f6', paddingBottom: 6 }}>
+                    <p style={{ color: '#111827', fontWeight: 'bold', fontSize: 17, margin: '0 0 1px 0',
+                      fontFamily: gujFont, lineHeight: 1.2 }}>
+                      {patient.name_gujarati}
+                    </p>
+                    <p style={{ color: '#9ca3af', fontSize: 10, margin: 0,
+                      fontFamily: "'Arial', sans-serif" }}>
+                      {patient.name}
+                    </p>
+                  </div>
+                ) : (
+                  <p style={{ color: '#111827', fontWeight: 'bold', fontSize: 17, margin: '0 0 7px 0',
+                    fontFamily: gujFont, lineHeight: 1.2, borderBottom: '1px solid #f3f4f6',
+                    paddingBottom: 6 }}>
+                    {patient.name}
+                  </p>
+                )}
 
                 {/* Age / Gender / Date row */}
                 <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>

@@ -18,12 +18,12 @@ export default function RegisterPatient() {
   const savedDraft = (() => { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null') } catch { return null } })()
 
   const [form, setForm] = useState<{
-    name: string; age: string; gender: 'Male' | 'Female' | 'Other';
+    name: string; name_gujarati: string; age: string; gender: 'Male' | 'Female' | 'Other';
     phone: string; address: string; referred_by: string;
     fees_type: 'per_session' | 'package'; fees_amount: string;
     previous_sessions: string;
   }>(savedDraft?.form ?? {
-    name: '', age: '', gender: 'Male',
+    name: '', name_gujarati: '', age: '', gender: 'Male',
     phone: '', address: '', referred_by: '',
     fees_type: 'per_session',
     fees_amount: '350',
@@ -61,6 +61,7 @@ export default function RegisterPatient() {
   }, [])
 
   const TITLE_CASE_FIELDS = ['name', 'address', 'referred_by']
+  // Note: name_gujarati is excluded — Gujarati script doesn't use title case
 
   function toTitleCase(str: string) {
     return str.replace(/\b\w/g, c => c.toUpperCase())
@@ -113,6 +114,7 @@ export default function RegisterPatient() {
       const patientData = {
         registration_number: regNo,
         name: form.name.trim(),
+        name_gujarati: form.name_gujarati.trim() || null,
         age: parseInt(form.age),
         gender: form.gender,
         phone: form.phone.trim(),
@@ -137,7 +139,7 @@ export default function RegisterPatient() {
       setNewPatient(data)
       localStorage.removeItem(DRAFT_KEY)
       setHasDraft(false)
-      setForm({ name: '', age: '', gender: 'Male', phone: '', address: '',
+      setForm({ name: '', name_gujarati: '', age: '', gender: 'Male', phone: '', address: '',
         referred_by: '', fees_type: 'per_session', fees_amount: '350', previous_sessions: '0' })
       setSelectedComplaints([])
       setOtherComplaint('')
@@ -170,7 +172,7 @@ export default function RegisterPatient() {
           <button type="button" onClick={() => {
             localStorage.removeItem(DRAFT_KEY)
             setHasDraft(false)
-            setForm({ name: '', age: '', gender: 'Male', phone: '', address: '', referred_by: '', fees_type: 'per_session', fees_amount: '350', previous_sessions: '0' })
+            setForm({ name: '', name_gujarati: '', age: '', gender: 'Male', phone: '', address: '', referred_by: '', fees_type: 'per_session', fees_amount: '350', previous_sessions: '0' })
             setSelectedComplaints([])
             setOtherComplaint('')
           }} className="text-xs text-blue-500 underline ml-2">Clear</button>
@@ -194,6 +196,18 @@ export default function RegisterPatient() {
               placeholder="Patient's full name"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400"
               required />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              નામ (ગુજરાતી)
+              <span className="text-gray-400 font-normal ml-1">— નિજ-આધાર કાર્ડ માટે</span>
+            </label>
+            <input value={form.name_gujarati} onChange={e => set('name_gujarati', e.target.value)}
+              placeholder="દા.ત. રાજેશ પટેલ"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400"
+              style={{ fontFamily: "'Anek Gujarati', sans-serif" }} />
+            <p className="text-xs text-gray-400 mt-1">ગુજરાતી કીબોર્ડ વાપરીને ટાઈપ કરો (વૈકલ્પિક)</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

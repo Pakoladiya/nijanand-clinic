@@ -16,6 +16,7 @@ export interface Patient {
   id: string
   registration_number: string
   name: string
+  name_gujarati: string | null
   age: number
   gender: 'Male' | 'Female' | 'Other'
   phone: string
