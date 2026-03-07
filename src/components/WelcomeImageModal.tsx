@@ -49,10 +49,6 @@ export default function WelcomeImageModal({ patient, onClose }: Props) {
     }, 'image/jpeg', 0.95)
   }
 
-  const feesText = patient.fees_type === 'per_session'
-    ? `₹${patient.fees_amount} પ્રતિ સત્ર`
-    : `₹${patient.fees_amount} (પેકેજ)`
-
   const gujFont = "'Anek Gujarati', Arial, sans-serif"
   const issueDate = new Date(patient.created_at)
     .toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' })
@@ -221,21 +217,17 @@ export default function WelcomeImageModal({ patient, onClose }: Props) {
               </div>
             </div>
 
-            {/* ── Green Footer (like Aadhaar blue bottom) ── */}
+            {/* ── Green Footer ── */}
             <div style={{
               background: 'linear-gradient(135deg, #39A900 0%, #2d8700 100%)',
-              padding: '7px 14px',
+              padding: '8px 14px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
             }}>
-              <p style={{ color: 'white', fontSize: 10, fontWeight: 'bold', margin: 0, fontFamily: gujFont }}>
-                💰 {feesText}
-              </p>
-              <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.3)' }} />
-              <p style={{ color: 'rgba(255,255,255,0.95)', fontSize: 10, fontWeight: '600', margin: 0,
+              <p style={{ color: 'rgba(255,255,255,0.95)', fontSize: 11, fontWeight: '600', margin: 0,
                 fontFamily: gujFont }}>
-                ચળવળ એ દવા છે 💪
+                ✨ ક્ષતિહીન શરીર, ગતિશીલ જીવન
               </p>
               <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.3)' }} />
               <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: 10, margin: 0,
