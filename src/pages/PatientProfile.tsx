@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
-import { ArrowLeft, Phone, MapPin, Calendar, CreditCard, Plus, Download, Package, Trash2, Image } from 'lucide-react'
+import { ArrowLeft, Phone, MapPin, Calendar, CreditCard, Plus, Download, Package as PackageIcon, Trash2, Image } from 'lucide-react'
 import WelcomeImageModal from '../components/WelcomeImageModal'
 import type { Patient, Attendance, Payment, Package } from '../types'
 
@@ -283,7 +283,7 @@ export default function PatientProfile({ patient, onBack }: Props) {
             <button onClick={() => { setShowPackageForm(v => !v); setShowPaymentForm(false) }}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold"
               style={{ backgroundColor: '#F6A000' }}>
-              <Package size={15} /> Create Package
+              <PackageIcon size={15} /> Create Package
             </button>
             <button onClick={() => { setShowPaymentForm(v => !v); setShowPackageForm(false) }}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold"
@@ -400,7 +400,7 @@ export default function PatientProfile({ patient, onBack }: Props) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f0fce8' }}>
-                    <Package size={14} style={{ color: '#39A900' }} />
+                    <PackageIcon size={14} style={{ color: '#39A900' }} />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-gray-800">{pkg.total_sessions} Sessions Package</p>
