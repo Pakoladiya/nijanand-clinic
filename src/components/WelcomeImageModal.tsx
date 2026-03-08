@@ -101,6 +101,10 @@ export default function WelcomeImageModal({ patient, onClose }: Props) {
                     fontFamily: "'Arial', sans-serif", letterSpacing: '0.3px' }}>
                     Nijanand Fitness Centre
                   </p>
+                  <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 8, margin: '2px 0 0 0',
+                    fontFamily: gujFont, lineHeight: 1.3 }}>
+                    ૨૪૧, રોયલ આર્કેડ, સરથાણા જકાતનાકા, સુરત
+                  </p>
                 </div>
               </div>
 
