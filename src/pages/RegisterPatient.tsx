@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import CameraCapture from '../components/CameraCapture'
 import WelcomeImageModal from '../components/WelcomeImageModal'
 import { UserPlus, CheckCircle, AlertCircle } from 'lucide-react'
+import { format } from 'date-fns'
 import type { Patient } from '../types'
 
 const COMPLAINTS = ['Back Pain', 'Neck Pain', 'Knee Pain', 'Shoulder Pain', 'Hip Pain',
@@ -20,13 +21,12 @@ export default function RegisterPatient() {
   const [form, setForm] = useState<{
     name: string; name_gujarati: string; age: string; gender: 'Male' | 'Female' | 'Other';
     phone: string; address: string; referred_by: string;
-    fees_type: 'per_session' | 'package'; fees_amount: string;
+    first_day_fee: string;
     previous_sessions: string;
   }>(savedDraft?.form ?? {
     name: '', name_gujarati: '', age: '', gender: 'Male',
     phone: '', address: '', referred_by: '',
-    fees_type: 'per_session',
-    fees_amount: '350',
+    first_day_fee: '100',
     previous_sessions: '0',
   })
   const [selectedComplaints, setSelectedComplaints] = useState<string[]>(savedDraft?.selectedComplaints ?? [])
@@ -147,8 +147,9 @@ export default function RegisterPatient() {
         address: form.address.trim(),
         photo_url: photoUrl,
         chief_complaint: complaints.join(', '),
-        fees_type: form.fees_type,
-        fees_amount: parseFloat(form.fees_amount),
+        registration_fee: parseFloat(form.first_day_fee) || 0,
+        fees_type: 'per_session',  // kept for DB compatibility
+        fees_amount: 0,            // kept for DB compatibility
         referred_by: form.referred_by.trim() || null,
         previous_sessions: parseInt(form.previous_sessions) || 0,
         registered_by: staff.id,
@@ -159,6 +160,19 @@ export default function RegisterPatient() {
 
       if (insertError) throw insertError
 
+      // Auto-record first day charge as a payment
+      const firstDayFee = parseFloat(form.first_day_fee) || 0
+      if (firstDayFee > 0) {
+        await supabase.from('payments').insert({
+          patient_id: data.id,
+          amount: firstDayFee,
+          payment_type: 'registration_fee',
+          date: format(new Date(), 'yyyy-MM-dd'),
+          staff_id: staff.id,
+          notes: 'Day 1 registration charge',
+        })
+      }
+
       await logActivity(staff.id, 'PATIENT_REGISTERED',
         `Registered new patient: ${form.name} (${regNo})`)
 
@@ -167,7 +181,7 @@ export default function RegisterPatient() {
       setHasDraft(false)
       setGujaratiConfirmed(false)
       setForm({ name: '', name_gujarati: '', age: '', gender: 'Male', phone: '', address: '',
-        referred_by: '', fees_type: 'per_session', fees_amount: '350', previous_sessions: '0' })
+        referred_by: '', first_day_fee: '100', previous_sessions: '0' })
       setSelectedComplaints([])
       setOtherComplaint('')
       setPhoto('')
@@ -199,7 +213,7 @@ export default function RegisterPatient() {
           <button type="button" onClick={() => {
             localStorage.removeItem(DRAFT_KEY)
             setHasDraft(false)
-            setForm({ name: '', name_gujarati: '', age: '', gender: 'Male', phone: '', address: '', referred_by: '', fees_type: 'per_session', fees_amount: '350', previous_sessions: '0' })
+            setForm({ name: '', name_gujarati: '', age: '', gender: 'Male', phone: '', address: '', referred_by: '', first_day_fee: '100', previous_sessions: '0' })
             setSelectedComplaints([])
             setOtherComplaint('')
           }} className="text-xs text-blue-500 underline ml-2">Clear</button>
@@ -372,30 +386,20 @@ export default function RegisterPatient() {
           )}
         </div>
 
-        {/* Fees */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
-          <p className="text-sm font-semibold text-gray-700">Fees for Welcome Card</p>
-          <div className="flex gap-3">
-            {(['per_session', 'package'] as const).map(type => (
-              <button type="button" key={type}
-                onClick={() => set('fees_type', type)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium border transition-colors"
-                style={form.fees_type === type
-                  ? { backgroundColor: '#39A900', borderColor: '#39A900', color: 'white' }
-                  : { backgroundColor: 'white', borderColor: '#e5e7eb', color: '#374151' }}>
-                {type === 'per_session' ? 'Per Session' : 'Package'}
-              </button>
-            ))}
+        {/* First Day Charge */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">First Day Charge</p>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-600">Auto-recorded as payment</span>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              {form.fees_type === 'per_session' ? 'Per Session Amount (₹)' : 'Package Amount (₹)'}
-            </label>
-            <input type="number" value={form.fees_amount}
-              onChange={e => set('fees_amount', e.target.value)}
-              placeholder="350"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-semibold text-gray-400">₹</span>
+            <input type="number" value={form.first_day_fee}
+              onChange={e => set('first_day_fee', e.target.value)}
+              placeholder="100"
+              className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
           </div>
+          <p className="text-xs text-gray-400">Package deal (10 / 15 / 30 sessions) can be added from the patient's profile after registration.</p>
         </div>
 
         {error && (

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
 import { ArrowLeft, Phone, MapPin, Calendar, CreditCard, Plus, Download, Package, Trash2, Image } from 'lucide-react'
 import WelcomeImageModal from '../components/WelcomeImageModal'
-import type { Patient, Attendance, Payment } from '../types'
+import type { Patient, Attendance, Payment, Package } from '../types'
 
 interface Props { patient: Patient; onBack: () => void }
 
@@ -12,53 +12,67 @@ export default function PatientProfile({ patient, onBack }: Props) {
   const { staff } = useAuth()
   const [attendance, setAttendance] = useState<Attendance[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
+  const [packages, setPackages] = useState<Package[]>([])
   const [tab, setTab] = useState<'visits' | 'fees'>('visits')
   const [showPaymentForm, setShowPaymentForm] = useState(false)
+  const [showPackageForm, setShowPackageForm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [showWelcomeCard, setShowWelcomeCard] = useState(false)
-  const [payForm, setPayForm] = useState({ amount: '', type: 'per_session' as Payment['payment_type'], notes: '', date: format(new Date(), 'yyyy-MM-dd'), sessions: '', start_date: format(new Date(), 'yyyy-MM-dd') })
+  const [pkgForm, setPkgForm] = useState({ sessions: '15', total_amount: '' })
+  const [payForm, setPayForm] = useState({ amount: '', notes: '', date: format(new Date(), 'yyyy-MM-dd') })
 
   useEffect(() => { loadData() }, [patient.id])
 
   async function loadData() {
-    const [{ data: att }, { data: pay }] = await Promise.all([
+    const [{ data: att }, { data: pay }, { data: pkg }] = await Promise.all([
       supabase.from('attendance').select('*').eq('patient_id', patient.id).order('date', { ascending: false }),
-      supabase.from('payments').select('*').eq('patient_id', patient.id).order('date', { ascending: false })
+      supabase.from('payments').select('*').eq('patient_id', patient.id).order('date', { ascending: false }),
+      supabase.from('packages').select('*').eq('patient_id', patient.id).order('created_at'),
     ])
     setAttendance(att || [])
     setPayments(pay || [])
+    setPackages(pkg || [])
   }
 
   const totalPaid = payments.reduce((s, p) => s + p.amount, 0)
   const prevSessions = patient.previous_sessions || 0
   const totalVisits = attendance.length + prevSessions
-  const sessionCost = totalVisits * patient.fees_amount
-  const balance = totalPaid - sessionCost
+  const registrationFee = patient.registration_fee || 0
+  const packageTotal = packages.reduce((s, p) => s + (p.total_amount || 0), 0)
+  const totalOwed = registrationFee + packageTotal
+  const balance = totalPaid - totalOwed
   const isDue = balance < 0
   const isAdvance = balance > 0
 
   async function addPayment() {
     if (!staff || !payForm.amount) return
     const amount = parseFloat(payForm.amount)
-
-    if (payForm.type === 'package') {
-      await supabase.from('packages').insert({
-        patient_id: patient.id, total_sessions: parseInt(payForm.sessions) || 10,
-        amount_paid: amount, start_date: payForm.start_date, created_by: staff.id
-      })
-    }
-
     await supabase.from('payments').insert({
-      patient_id: patient.id, amount, payment_type: payForm.type,
-      date: payForm.date, staff_id: staff.id, notes: payForm.notes
+      patient_id: patient.id, amount, payment_type: 'package',
+      date: payForm.date, staff_id: staff.id, notes: payForm.notes,
     })
-
     await logActivity(staff.id, 'PAYMENT_ADDED',
       `Payment ₹${amount} for ${patient.name} (${patient.registration_number})`)
-
     setShowPaymentForm(false)
-    setPayForm({ amount: '', type: 'per_session', notes: '', date: format(new Date(), 'yyyy-MM-dd'), sessions: '', start_date: format(new Date(), 'yyyy-MM-dd') })
+    setPayForm({ amount: '', notes: '', date: format(new Date(), 'yyyy-MM-dd') })
+    loadData()
+  }
+
+  async function createPackage() {
+    if (!staff || !pkgForm.total_amount || !pkgForm.sessions) return
+    await supabase.from('packages').insert({
+      patient_id: patient.id,
+      total_sessions: parseInt(pkgForm.sessions),
+      total_amount: parseFloat(pkgForm.total_amount),
+      amount_paid: 0,
+      start_date: format(new Date(), 'yyyy-MM-dd'),
+      created_by: staff.id,
+    })
+    await logActivity(staff.id, 'PACKAGE_CREATED',
+      `Package: ${pkgForm.sessions} sessions ₹${pkgForm.total_amount} for ${patient.name}`)
+    setShowPackageForm(false)
+    setPkgForm({ sessions: '15', total_amount: '' })
     loadData()
   }
 
@@ -263,27 +277,71 @@ export default function PatientProfile({ patient, onBack }: Props) {
       {/* Fees Tab */}
       {tab === 'fees' && (
         <div className="space-y-3">
-          <button onClick={() => setShowPaymentForm(!showPaymentForm)}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold"
-            style={{ backgroundColor: '#39A900' }}>
-            <Plus size={16} /> Add Payment
-          </button>
 
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            <button onClick={() => { setShowPackageForm(v => !v); setShowPaymentForm(false) }}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold"
+              style={{ backgroundColor: '#F6A000' }}>
+              <Package size={15} /> Create Package
+            </button>
+            <button onClick={() => { setShowPaymentForm(v => !v); setShowPackageForm(false) }}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold"
+              style={{ backgroundColor: '#39A900' }}>
+              <Plus size={15} /> Add Payment
+            </button>
+          </div>
+
+          {/* Create Package Form */}
+          {showPackageForm && (
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
+              <p className="text-sm font-semibold text-gray-700">New Package Deal</p>
+              <div>
+                <label className="text-xs text-gray-500 block mb-2">Number of Sessions</label>
+                <div className="flex gap-2">
+                  {['10', '15', '30'].map(s => (
+                    <button key={s} type="button"
+                      onClick={() => setPkgForm(f => ({ ...f, sessions: s }))}
+                      className="flex-1 py-2 rounded-xl text-sm font-medium border transition-colors"
+                      style={pkgForm.sessions === s
+                        ? { backgroundColor: '#F6A000', borderColor: '#F6A000', color: 'white' }
+                        : { backgroundColor: 'white', borderColor: '#e5e7eb', color: '#374151' }}>
+                      {s}
+                    </button>
+                  ))}
+                  <input type="number"
+                    value={!['10', '15', '30'].includes(pkgForm.sessions) ? pkgForm.sessions : ''}
+                    onChange={e => setPkgForm(f => ({ ...f, sessions: e.target.value }))}
+                    placeholder="Other"
+                    className="flex-1 border border-gray-200 rounded-xl px-2 py-2 text-sm text-center focus:outline-none focus:border-orange-400" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Agreed Total Amount (₹)</label>
+                <input type="number" value={pkgForm.total_amount}
+                  onChange={e => setPkgForm(f => ({ ...f, total_amount: e.target.value }))}
+                  placeholder="e.g. 3000"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={createPackage}
+                  disabled={!pkgForm.total_amount || !pkgForm.sessions}
+                  className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-50"
+                  style={{ backgroundColor: '#F6A000' }}>
+                  Confirm Package
+                </button>
+                <button onClick={() => setShowPackageForm(false)}
+                  className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Add Payment Form */}
           {showPaymentForm && (
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-3">
-              <div className="flex gap-2">
-                {(['per_session', 'package', 'advance'] as const).map(t => (
-                  <button key={t} type="button"
-                    onClick={() => setPayForm(f => ({ ...f, type: t }))}
-                    className="flex-1 py-2 rounded-xl text-xs font-medium border transition-colors"
-                    style={payForm.type === t
-                      ? { backgroundColor: '#F6A000', borderColor: '#F6A000', color: 'white' }
-                      : { backgroundColor: 'white', borderColor: '#e5e7eb', color: '#374151' }}>
-                    {t === 'per_session' ? 'Per Session' : t === 'package' ? 'Package' : 'Advance'}
-                  </button>
-                ))}
-              </div>
-
+              <p className="text-sm font-semibold text-gray-700">Record Payment</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Amount (₹) *</label>
@@ -299,33 +357,13 @@ export default function PatientProfile({ patient, onBack }: Props) {
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
                 </div>
               </div>
-
-              {payForm.type === 'package' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Sessions in package</label>
-                    <input type="number" value={payForm.sessions}
-                      onChange={e => setPayForm(f => ({ ...f, sessions: e.target.value }))}
-                      placeholder="10"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Package Start Date</label>
-                    <input type="date" value={payForm.start_date}
-                      onChange={e => setPayForm(f => ({ ...f, start_date: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
-                  </div>
-                </div>
-              )}
-
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Notes (optional)</label>
                 <input value={payForm.notes}
                   onChange={e => setPayForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="e.g. Cash, UPI, etc."
+                  placeholder="e.g. Cash, UPI, partial payment..."
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
               </div>
-
               <div className="flex gap-2">
                 <button onClick={addPayment}
                   className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold"
@@ -340,23 +378,74 @@ export default function PatientProfile({ patient, onBack }: Props) {
             </div>
           )}
 
+          {/* Registration Fee row */}
+          {registrationFee > 0 && (
+            <div className="bg-white rounded-2xl px-4 py-3 shadow-sm border border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FEF3C7' }}>
+                  <CreditCard size={14} style={{ color: '#F6A000' }} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Registration Fee</p>
+                  <p className="text-xs text-gray-400">Day 1 charge</p>
+                </div>
+              </div>
+              <p className="text-sm font-bold" style={{ color: '#F6A000' }}>₹{registrationFee.toLocaleString()}</p>
+            </div>
+          )}
+
+          {/* Packages */}
+          {packages.map(pkg => (
+            <div key={pkg.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f0fce8' }}>
+                    <Package size={14} style={{ color: '#39A900' }} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{pkg.total_sessions} Sessions Package</p>
+                    <p className="text-xs text-gray-400">{format(parseISO(pkg.start_date), 'dd MMM yyyy')}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-gray-800">₹{(pkg.total_amount || 0).toLocaleString()}</p>
+                  <p className="text-xs text-gray-400">agreed total</p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 pl-10">
+                {Math.min(totalVisits, pkg.total_sessions)} / {pkg.total_sessions} sessions used
+              </p>
+            </div>
+          ))}
+
+          {/* Nudge if no package yet */}
+          {packages.length === 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-center">
+              <p className="text-xs text-amber-700">No package yet. Tap <strong>Create Package</strong> once the deal is finalised.</p>
+            </div>
+          )}
+
+          {/* Payment History */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 pt-3 pb-1">Payment History</p>
             {payments.length === 0 ? (
-              <p className="text-center text-sm text-gray-400 py-8">No payments recorded</p>
+              <p className="text-center text-sm text-gray-400 py-6 pb-8">No payments recorded</p>
             ) : payments.map(p => (
               <div key={p.id} className="flex items-center gap-3 px-4 py-3 border-b last:border-0 border-gray-50">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: p.payment_type === 'package' ? '#f0fce8' : '#FEF3C7' }}>
-                  {p.payment_type === 'package' ? <Package size={14} style={{ color: '#39A900' }} /> : <CreditCard size={14} style={{ color: '#F6A000' }} />}
+                  style={{ backgroundColor: '#f0fce8' }}>
+                  <CreditCard size={14} style={{ color: '#39A900' }} />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-gray-800">₹{p.amount.toLocaleString()}</p>
-                  <p className="text-xs text-gray-400 capitalize">{p.payment_type.replace('_', ' ')} • {format(parseISO(p.date), 'dd MMM yyyy')}</p>
-                  {p.notes && <p className="text-xs text-gray-400">{p.notes}</p>}
+                  <p className="text-xs text-gray-400">
+                    {format(parseISO(p.date), 'dd MMM yyyy')}{p.notes ? ` · ${p.notes}` : ''}
+                  </p>
                 </div>
               </div>
             ))}
           </div>
+
         </div>
       )}
     </div>

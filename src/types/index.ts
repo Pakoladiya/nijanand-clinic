@@ -1,6 +1,6 @@
 export type Role = 'admin' | 'staff'
 export type Session = 'morning' | 'evening'
-export type PaymentType = 'per_session' | 'package' | 'advance'
+export type PaymentType = 'per_session' | 'package' | 'advance' | 'registration_fee'
 export type FeesType = 'per_session' | 'package'
 
 export interface Staff {
@@ -27,6 +27,7 @@ export interface Patient {
   chief_complaint: string
   fees_type: FeesType
   fees_amount: number
+  registration_fee: number | null
   referred_by: string | null
   previous_sessions: number
   registered_by: string
@@ -54,7 +55,8 @@ export interface Package {
   id: string
   patient_id: string
   total_sessions: number
-  amount_paid: number
+  total_amount: number  // negotiated package price
+  amount_paid: number   // legacy field, kept for compat
   start_date: string
   created_by: string
   created_at: string
