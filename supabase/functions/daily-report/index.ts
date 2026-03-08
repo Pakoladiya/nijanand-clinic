@@ -261,7 +261,7 @@ Deno.serve(async (req: Request) => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'Nijanand Clinic <onboarding@resend.dev>',
+      from: 'Nijanand Clinic <reports@nijanandfit.in>',
       to:   [ADMIN_EMAIL],
       subject: `NFC Daily Report — ${dateFormatted}`,
       html,
