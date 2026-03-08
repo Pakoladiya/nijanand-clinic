@@ -33,12 +33,18 @@ export default function RegisterPatient() {
   const [otherComplaint, setOtherComplaint] = useState(savedDraft?.otherComplaint ?? '')
   const [hasDraft, setHasDraft] = useState(!!savedDraft)
   const [refSuggestions, setRefSuggestions] = useState<string[]>([])
+  const [nameSuggestions, setNameSuggestions] = useState<string[]>([])
+  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([])
+  const [showNameSugg, setShowNameSugg] = useState(false)
+  const [showAddrSugg, setShowAddrSugg] = useState(false)
   const [prevSessionsEnabled, setPrevSessionsEnabled] = useState(false)
   const [photo, setPhoto] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [translitLoading, setTranslitLoading] = useState(false)
   const [gujaratiConfirmed, setGujaratiConfirmed] = useState(false)
   const translitTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const nameTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const addrTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [error, setError] = useState('')
   const [newPatient, setNewPatient] = useState<Patient | null>(null)
 
@@ -73,10 +79,20 @@ export default function RegisterPatient() {
   function set(field: string, value: string) {
     const processed = TITLE_CASE_FIELDS.includes(field) ? toTitleCase(value) : value
     setForm(f => ({ ...f, [field]: processed }))
-    // Auto-transliterate English name → Gujarati after 600ms pause
-    if (field === 'name' && value.trim().length > 1) {
-      if (translitTimer.current) clearTimeout(translitTimer.current)
-      translitTimer.current = setTimeout(() => autoTransliterate(value.trim()), 600)
+    if (field === 'name') {
+      // Auto-transliterate English name → Gujarati after 600ms pause
+      if (value.trim().length > 1) {
+        if (translitTimer.current) clearTimeout(translitTimer.current)
+        translitTimer.current = setTimeout(() => autoTransliterate(value.trim()), 600)
+      }
+      // Name suggestions with 300ms debounce
+      if (nameTimer.current) clearTimeout(nameTimer.current)
+      nameTimer.current = setTimeout(() => fetchNameSuggestions(value.trim()), 300)
+    }
+    if (field === 'address') {
+      // Address suggestions with 300ms debounce
+      if (addrTimer.current) clearTimeout(addrTimer.current)
+      addrTimer.current = setTimeout(() => fetchAddressSuggestions(value.trim()), 300)
     }
   }
 
@@ -96,6 +112,24 @@ export default function RegisterPatient() {
       // Silently fail — staff can type manually
     }
     setTranslitLoading(false)
+  }
+
+  async function fetchNameSuggestions(q: string) {
+    if (q.length < 2) { setNameSuggestions([]); setShowNameSugg(false); return }
+    const { data } = await supabase.from('patients').select('name')
+      .ilike('name', `%${q}%`).order('name').limit(6)
+    const unique = [...new Set((data || []).map((r: any) => r.name as string))]
+    setNameSuggestions(unique)
+    setShowNameSugg(unique.length > 0)
+  }
+
+  async function fetchAddressSuggestions(q: string) {
+    if (q.length < 3) { setAddressSuggestions([]); setShowAddrSugg(false); return }
+    const { data } = await supabase.from('patients').select('address')
+      .ilike('address', `%${q}%`).limit(20)
+    const unique = [...new Set((data || []).map((r: any) => r.address as string).filter(Boolean))]
+    setAddressSuggestions(unique.slice(0, 6))
+    setShowAddrSugg(unique.length > 0)
   }
 
   function toggleComplaint(c: string) {
@@ -231,12 +265,27 @@ export default function RegisterPatient() {
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
           <p className="text-sm font-semibold text-gray-700">Personal Information</p>
 
-          <div>
+          <div className="relative">
             <label className="block text-xs font-medium text-gray-600 mb-1">Full Name *</label>
             <input value={form.name} onChange={e => set('name', e.target.value)}
+              onBlur={() => setTimeout(() => setShowNameSugg(false), 150)}
+              onFocus={() => nameSuggestions.length > 0 && setShowNameSugg(true)}
               placeholder="Patient's full name"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400"
               required />
+            {showNameSugg && nameSuggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden">
+                <p className="text-xs text-gray-400 px-3 pt-2 pb-1">Already registered:</p>
+                {nameSuggestions.map(s => (
+                  <button key={s} type="button"
+                    onMouseDown={() => { set('name', s); setShowNameSugg(false) }}
+                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 border-t border-gray-50 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400 flex-shrink-0" />
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
@@ -320,12 +369,27 @@ export default function RegisterPatient() {
             )}
           </div>
 
-          <div>
+          <div className="relative">
             <label className="block text-xs font-medium text-gray-600 mb-1">Address *</label>
             <textarea value={form.address} onChange={e => set('address', e.target.value)}
+              onBlur={() => setTimeout(() => setShowAddrSugg(false), 150)}
+              onFocus={() => addressSuggestions.length > 0 && setShowAddrSugg(true)}
               placeholder="Patient's address" rows={2}
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 resize-none"
               required />
+            {showAddrSugg && addressSuggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden">
+                <p className="text-xs text-gray-400 px-3 pt-2 pb-1">Previously used addresses:</p>
+                {addressSuggestions.map(s => (
+                  <button key={s} type="button"
+                    onMouseDown={() => { set('address', s); setShowAddrSugg(false) }}
+                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 border-t border-gray-50 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
