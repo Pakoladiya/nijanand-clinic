@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { Search, User, Phone, ChevronRight } from 'lucide-react'
@@ -16,12 +17,29 @@ export default function PatientsPage() {
 
   async function loadPatients() {
     setLoading(true)
-    let query = supabase.from('patients').select('*').order('created_at', { ascending: false })
+    const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd')
+
     if (search.length >= 2) {
-      query = query.or(`name.ilike.%${search}%,registration_number.ilike.%${search}%,phone.ilike.%${search}%`)
+      // Search: fetch matches + yesterday's attendees, sort yesterday-attendees first
+      const [{ data: matched }, { data: yestAtt }] = await Promise.all([
+        supabase.from('patients').select('*')
+          .or(`name.ilike.%${search}%,registration_number.ilike.%${search}%,phone.ilike.%${search}%`)
+          .order('created_at', { ascending: false }).limit(100),
+        supabase.from('attendance').select('patient_id').eq('date', yesterday),
+      ])
+      const yestIds = new Set((yestAtt || []).map((a: any) => a.patient_id))
+      const sorted = [...(matched || [])].sort((a, b) => {
+        const aP = yestIds.has(a.id) ? 0 : 1
+        const bP = yestIds.has(b.id) ? 0 : 1
+        return aP - bP
+      })
+      setPatients(sorted.slice(0, 50))
+    } else {
+      // No search: most recently registered first
+      const { data } = await supabase.from('patients').select('*')
+        .order('created_at', { ascending: false }).limit(50)
+      setPatients(data || [])
     }
-    const { data } = await query.limit(50)
-    setPatients(data || [])
     setLoading(false)
   }
 

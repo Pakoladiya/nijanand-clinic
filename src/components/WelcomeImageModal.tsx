@@ -97,10 +97,6 @@ export default function WelcomeImageModal({ patient, onClose }: Props) {
                     fontFamily: gujFont, lineHeight: 1.2 }}>
                     નિજાનંદ ફિટનેસ સેન્ટર
                   </p>
-                  <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 9, margin: 0,
-                    fontFamily: "'Arial', sans-serif", letterSpacing: '0.3px' }}>
-                    Nijanand Fitness Centre
-                  </p>
                   <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 8, margin: '2px 0 0 0',
                     fontFamily: gujFont, lineHeight: 1.3 }}>
                     ૨૪૧, રોયલ આર્કેડ, સરથાણા જકાતનાકા, સુરત
@@ -214,8 +210,9 @@ export default function WelcomeImageModal({ patient, onClose }: Props) {
                     letterSpacing: '0.4px', textTransform: 'uppercase' }}>
                     નોંધણી નંબર / Registration No.
                   </p>
-                  <p style={{ color: '#F6A000', fontWeight: 'bold', fontSize: 20, margin: 0,
-                    letterSpacing: '2px', fontFamily: "'Arial', sans-serif", lineHeight: 1 }}>
+                  <p style={{ color: '#F6A000', fontWeight: 'bold', fontSize: 17, margin: 0,
+                    letterSpacing: '1.5px', fontFamily: "'Arial', sans-serif", lineHeight: 1,
+                    whiteSpace: 'nowrap' }}>
                     {patient.registration_number}
                   </p>
                 </div>

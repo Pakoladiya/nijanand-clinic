@@ -46,11 +46,20 @@ export default function AttendancePage() {
   async function searchPatients(q: string) {
     setSearchQuery(q)
     if (q.length < 2) { setSearchResults([]); return }
-    const { data } = await supabase
-      .from('patients').select('id, name, registration_number, chief_complaint')
-      .or(`name.ilike.%${q}%,registration_number.ilike.%${q}%`)
-      .limit(5)
-    setSearchResults((data as Patient[]) || [])
+    const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd')
+    const [{ data: matched }, { data: yestAtt }] = await Promise.all([
+      supabase.from('patients').select('id, name, registration_number, chief_complaint')
+        .or(`name.ilike.%${q}%,registration_number.ilike.%${q}%`)
+        .order('created_at', { ascending: false }).limit(20),
+      supabase.from('attendance').select('patient_id').eq('date', yesterday),
+    ])
+    const yestIds = new Set((yestAtt || []).map((a: any) => a.patient_id))
+    const sorted = [...(matched || [])].sort((a, b) => {
+      const aP = yestIds.has(a.id) ? 0 : 1
+      const bP = yestIds.has(b.id) ? 0 : 1
+      return aP - bP
+    })
+    setSearchResults(sorted.slice(0, 8) as Patient[])
   }
 
   async function markAttendance(patient: Patient) {
