@@ -154,18 +154,6 @@ export default function ReceptionPage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: '#FEF3C7' }}>
-          <ClipboardList size={20} style={{ color: '#F6A000' }} />
-        </div>
-        <div>
-          <h1 className="text-lg font-bold text-gray-800">Reception</h1>
-          <p className="text-xs text-gray-400">{format(new Date(), 'EEEE, d MMM yyyy')}</p>
-        </div>
-      </div>
-
       {/* Sub-tabs: Register | Waiting | Attended */}
       <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1">
         <button

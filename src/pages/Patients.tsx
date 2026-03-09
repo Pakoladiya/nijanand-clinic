@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { Search, User, Phone, ChevronRight } from 'lucide-react'
+import { Search, Phone, ChevronRight } from 'lucide-react'
 import PatientProfile from './PatientProfile'
 import type { Patient } from '../types'
 
@@ -52,16 +52,6 @@ export default function PatientsPage() {
 
   return (
     <div className="max-w-lg mx-auto pb-8">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#EFF6FF' }}>
-          <User size={20} className="text-blue-500" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">Patients</h1>
-          <p className="text-sm text-gray-500">Search and manage records</p>
-        </div>
-      </div>
-
       <div className="relative mb-4">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input

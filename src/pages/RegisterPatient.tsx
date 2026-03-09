@@ -3,7 +3,7 @@ import { supabase, generateRegistrationNumber, logActivity } from '../lib/supaba
 import { useAuth } from '../context/AuthContext'
 import CameraCapture from '../components/CameraCapture'
 import WelcomeImageModal from '../components/WelcomeImageModal'
-import { UserPlus, CheckCircle, AlertCircle } from 'lucide-react'
+import { CheckCircle, AlertCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import type { Patient } from '../types'
 
@@ -229,17 +229,6 @@ export default function RegisterPatient() {
 
   return (
     <div className="max-w-lg mx-auto pb-8">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: '#FEF3C7' }}>
-          <UserPlus size={20} style={{ color: '#F6A000' }} />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">New Patient Registration</h1>
-          <p className="text-sm text-gray-500">Nijanand Fitness Centre</p>
-        </div>
-      </div>
-
       {hasDraft && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">

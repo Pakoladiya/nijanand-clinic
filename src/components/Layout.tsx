@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { UserPlus, CalendarCheck, Users, Shield, LogOut, ClipboardList, ListOrdered } from 'lucide-react'
+import { UserPlus, CalendarCheck, Users, Shield, ClipboardList, ListOrdered } from 'lucide-react'
 
 interface NavItem { key: string; label: string; Icon: any; adminOnly?: boolean; staffOnly?: boolean }
 
@@ -16,7 +16,7 @@ const NAV: NavItem[] = [
 interface LayoutProps { page: string; setPage: (p: string) => void; children: ReactNode }
 
 export default function Layout({ page, setPage, children }: LayoutProps) {
-  const { staff, logout } = useAuth()
+  const { staff } = useAuth()
 
   const visibleNav = NAV.filter(n => {
     if (n.adminOnly && staff?.role !== 'admin') return false
@@ -36,17 +36,12 @@ export default function Layout({ page, setPage, children }: LayoutProps) {
               <p className="text-xs text-gray-400 leading-none">{staff?.name}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs px-2 py-1 rounded-full font-medium"
-              style={staff?.role === 'admin'
-                ? { backgroundColor: '#f0fce8', color: '#39A900' }
-                : { backgroundColor: '#FEF3C7', color: '#92400e' }}>
-              {staff?.role === 'admin' ? 'Admin' : 'Staff'}
-            </span>
-            <button onClick={logout} className="p-2 text-gray-400 hover:text-red-400 transition-colors">
-              <LogOut size={16} />
-            </button>
-          </div>
+          <span className="text-xs px-2 py-1 rounded-full font-medium"
+            style={staff?.role === 'admin'
+              ? { backgroundColor: '#f0fce8', color: '#39A900' }
+              : { backgroundColor: '#FEF3C7', color: '#92400e' }}>
+            {staff?.role === 'admin' ? 'Admin' : 'Staff'}
+          </span>
         </div>
       </header>
 

@@ -123,28 +123,16 @@ export default function QueuePage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: '#f0fce8' }}>
-            <ListOrdered size={20} style={{ color: '#39A900' }} />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-gray-800">Live Queue</h1>
-            <p className="text-xs text-gray-400">{format(new Date(), 'EEEE, d MMM yyyy')}</p>
-          </div>
-        </div>
+      {/* Last updated + refresh */}
+      <div className="flex items-center justify-center gap-2 mb-4">
+        <p className="text-xs text-gray-400">
+          🔴 Live · Updated {formatTime(lastUpdated.toISOString())}
+        </p>
         <button onClick={loadQueue}
-          className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-          <RefreshCw size={16} />
+          className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors">
+          <RefreshCw size={14} />
         </button>
       </div>
-
-      {/* Last updated */}
-      <p className="text-xs text-gray-400 text-center mb-4">
-        🔴 Live · Updated {formatTime(lastUpdated.toISOString())}
-      </p>
 
       {/* Session toggle */}
       <div className="flex gap-2 mb-4">

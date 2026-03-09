@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
-import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield, Eye, EyeOff, Settings, Search, Trash2, User, Clock, Download, Receipt } from 'lucide-react'
+import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield, Eye, EyeOff, Settings, Search, Trash2, User, Clock, Download, Receipt, LogOut } from 'lucide-react'
 import type { Staff, RegisteredDevice, ActivityLog, Patient } from '../types'
 import ExpensesPage from './Expenses'
 
 export default function AdminDashboard() {
-  const { staff } = useAuth()
+  const { staff, logout } = useAuth()
   const [tab, setTab] = useState<'staff' | 'devices' | 'activity' | 'patients' | 'finance'>('staff')
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [devices, setDevices] = useState<RegisteredDevice[]>([])
@@ -244,16 +244,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-lg mx-auto pb-8">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#f0fce8' }}>
-          <Shield size={20} style={{ color: '#39A900' }} />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">Admin Dashboard</h1>
-          <p className="text-sm text-gray-500">Manage staff, devices & logs</p>
-        </div>
-      </div>
-
       {/* Tabs */}
       <div className="grid grid-cols-5 gap-1 mb-5">
         {([['staff', 'Staff', Users], ['patients', 'Patients', User], ['devices', 'Devices', Smartphone], ['activity', 'Logs', Activity], ['finance', 'Finance', Receipt]] as const).map(([key, label, Icon]) => (
@@ -599,6 +589,13 @@ export default function AdminDashboard() {
             {backupLoading ? 'Preparing backup...' : 'Download Backup (.zip)'}
           </button>
         </div>
+
+        {/* Logout */}
+        <button
+          onClick={logout}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold border-2 border-red-100 text-red-500 bg-white hover:bg-red-50 transition-colors">
+          <LogOut size={16} /> Log Out
+        </button>
       </div>
     </div>
   )

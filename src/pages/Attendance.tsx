@@ -114,16 +114,6 @@ export default function AttendancePage() {
 
   return (
     <div className="max-w-lg mx-auto pb-8">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#f0fce8' }}>
-          <Sun size={20} style={{ color: '#39A900' }} />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">Daily Attendance</h1>
-          <p className="text-sm text-gray-500">Mark patient visits</p>
-        </div>
-      </div>
-
       {/* ── Compact Date Slider ── */}
       <div className="bg-white rounded-2xl px-3 pt-3 pb-2 shadow-sm border border-gray-100 mb-4"
         onTouchStart={e => { touchStartX.current = e.touches[0].clientX }}
