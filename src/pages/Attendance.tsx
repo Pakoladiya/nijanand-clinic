@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format, addDays, parseISO, isToday } from 'date-fns'
@@ -106,6 +106,7 @@ export default function AttendancePage() {
 
   const todayStr = format(new Date(), 'yyyy-MM-dd')
   const isPastDate = selectedDate !== todayStr
+  const touchStartX = useRef<number>(0)
 
   function shiftDate(days: number) {
     setSelectedDate(prev => format(addDays(parseISO(prev), days), 'yyyy-MM-dd'))
@@ -124,7 +125,12 @@ export default function AttendancePage() {
       </div>
 
       {/* ── Compact Date Slider ── */}
-      <div className="bg-white rounded-2xl px-3 pt-3 pb-2 shadow-sm border border-gray-100 mb-4">
+      <div className="bg-white rounded-2xl px-3 pt-3 pb-2 shadow-sm border border-gray-100 mb-4"
+        onTouchStart={e => { touchStartX.current = e.touches[0].clientX }}
+        onTouchEnd={e => {
+          const dx = e.changedTouches[0].clientX - touchStartX.current
+          if (Math.abs(dx) > 40) shiftDate(dx < 0 ? 1 : -1)
+        }}>
         {/* Month label + Today jump */}
         <div className="flex items-center justify-between mb-2 px-1">
           <span className="text-xs font-semibold text-gray-500">
