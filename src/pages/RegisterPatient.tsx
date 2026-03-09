@@ -39,6 +39,7 @@ export default function RegisterPatient() {
   const [showAddrSugg, setShowAddrSugg] = useState(false)
   const [prevSessionsEnabled, setPrevSessionsEnabled] = useState(false)
   const [photo, setPhoto] = useState<string>('')
+  const [capturedPhotoForCard, setCapturedPhotoForCard] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [translitLoading, setTranslitLoading] = useState(false)
   const [gujaratiConfirmed, setGujaratiConfirmed] = useState(false)
@@ -210,6 +211,7 @@ export default function RegisterPatient() {
       await logActivity(staff.id, 'PATIENT_REGISTERED',
         `Registered new patient: ${form.name} (${regNo})`)
 
+      setCapturedPhotoForCard(photo)   // save before clearing, so WelcomeImageModal can use it
       setNewPatient(data)
       localStorage.removeItem(DRAFT_KEY)
       setHasDraft(false)
@@ -484,7 +486,11 @@ export default function RegisterPatient() {
 
       {/* Success — Show Welcome Image */}
       {newPatient && (
-        <WelcomeImageModal patient={newPatient} onClose={() => setNewPatient(null)} />
+        <WelcomeImageModal
+          patient={newPatient}
+          capturedPhoto={capturedPhotoForCard}
+          onClose={() => { setNewPatient(null); setCapturedPhotoForCard('') }}
+        />
       )}
     </div>
   )
