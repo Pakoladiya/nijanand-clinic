@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
-import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield, Eye, EyeOff, Settings, Search, Trash2, User, Clock } from 'lucide-react'
+import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield, Eye, EyeOff, Settings, Search, Trash2, User, Clock, Download } from 'lucide-react'
 import type { Staff, RegisteredDevice, ActivityLog, Patient } from '../types'
 
 export default function AdminDashboard() {
@@ -24,6 +24,7 @@ export default function AdminDashboard() {
   const [settingsLoading, setSettingsLoading] = useState(false)
   const [editingTimeStaff, setEditingTimeStaff] = useState<string | null>(null)
   const [timeForm, setTimeForm] = useState({ start: '', end: '' })
+  const [backupLoading, setBackupLoading] = useState(false)
 
   useEffect(() => {
     if (tab === 'staff') loadStaff()
@@ -167,6 +168,69 @@ export default function AdminDashboard() {
     setEditingTimeStaff(null)
   }
 
+  // ── Data Backup ──
+  function toCSV(rows: any[]): string {
+    if (rows.length === 0) return 'No data'
+    const headers = Object.keys(rows[0])
+    const escape = (val: any) => {
+      const s = String(val ?? '').replace(/"/g, '""')
+      return s.includes(',') || s.includes('\n') || s.includes('"') ? `"${s}"` : s
+    }
+    return [
+      headers.join(','),
+      ...rows.map(row => headers.map(h => escape(row[h])).join(','))
+    ].join('\n')
+  }
+
+  async function downloadBackup() {
+    if (!staff) return
+    setBackupLoading(true)
+    try {
+      const [
+        { data: patientsData },
+        { data: attendanceData },
+        { data: paymentsData },
+        { data: expensesData },
+        { data: packagesData },
+        { data: waitingData },
+      ] = await Promise.all([
+        supabase.from('patients').select('*').order('created_at'),
+        supabase.from('attendance').select('*').order('date'),
+        supabase.from('payments').select('*').order('date'),
+        supabase.from('expenses').select('*').order('date'),
+        supabase.from('packages').select('*').order('created_at'),
+        supabase.from('waiting_list').select('*').order('added_at'),
+      ])
+
+      const JSZip = (await import('jszip')).default
+      const zip = new JSZip()
+      const dateStr = format(new Date(), 'yyyy-MM-dd')
+
+      zip.file('patients.csv', toCSV(patientsData || []))
+      zip.file('attendance.csv', toCSV(attendanceData || []))
+      zip.file('payments.csv', toCSV(paymentsData || []))
+      zip.file('expenses.csv', toCSV(expensesData || []))
+      zip.file('packages.csv', toCSV(packagesData || []))
+      zip.file('waiting_list.csv', toCSV(waitingData || []))
+
+      const blob = await zip.generateAsync({ type: 'blob' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `NFC-Backup-${dateStr}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      await logActivity(staff.id, 'DATA_BACKUP', `Downloaded full data backup (${dateStr})`)
+    } catch (err: any) {
+      alert(`Backup failed: ${err.message}`)
+    } finally {
+      setBackupLoading(false)
+    }
+  }
+
   if (staff?.role !== 'admin') {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -212,6 +276,25 @@ export default function AdminDashboard() {
             <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${prevSessionsEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
           </button>
         </div>
+      </div>
+
+      {/* Data Backup Card */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Download size={15} className="text-gray-500" />
+          <p className="text-sm font-semibold text-gray-700">Data Backup</p>
+        </div>
+        <p className="text-xs text-gray-400 mb-3">
+          Downloads all patients, attendance, payments, expenses and packages as CSV files in a single ZIP.
+        </p>
+        <button
+          onClick={downloadBackup}
+          disabled={backupLoading}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60"
+          style={{ backgroundColor: backupLoading ? '#9ca3af' : '#3b82f6' }}>
+          <Download size={15} />
+          {backupLoading ? 'Preparing backup...' : 'Download Backup (.zip)'}
+        </button>
       </div>
 
       {/* Tabs */}
