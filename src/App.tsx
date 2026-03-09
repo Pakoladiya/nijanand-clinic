@@ -9,6 +9,8 @@ import AttendancePage from './pages/Attendance'
 import PatientsPage from './pages/Patients'
 import ExpensesPage from './pages/Expenses'
 import AdminDashboard from './pages/AdminDashboard'
+import ReceptionPage from './pages/Reception'
+import QueuePage from './pages/Queue'
 import './index.css'
 
 function AppContent() {
@@ -37,6 +39,8 @@ function AppContent() {
       case 'patients': return <PatientsPage />
       case 'expenses': return <ExpensesPage />
       case 'admin': return <AdminDashboard />
+      case 'reception': return <ReceptionPage />
+      case 'queue': return <QueuePage />
       default: return <RegisterPatient />
     }
   }

@@ -1,15 +1,17 @@
 import { type ReactNode } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { UserPlus, CalendarCheck, Users, Receipt, Shield, LogOut } from 'lucide-react'
+import { UserPlus, CalendarCheck, Users, Receipt, Shield, LogOut, ClipboardList, ListOrdered } from 'lucide-react'
 
-interface NavItem { key: string; label: string; Icon: any; adminOnly?: boolean }
+interface NavItem { key: string; label: string; Icon: any; adminOnly?: boolean; staffOnly?: boolean }
 
 const NAV: NavItem[] = [
-  { key: 'register', label: 'Register', Icon: UserPlus },
-  { key: 'attendance', label: 'Attendance', Icon: CalendarCheck },
-  { key: 'patients', label: 'Patients', Icon: Users },
-  { key: 'expenses', label: 'Finance', Icon: Receipt },
-  { key: 'admin', label: 'Admin', Icon: Shield, adminOnly: true },
+  { key: 'register',   label: 'Register',   Icon: UserPlus },
+  { key: 'patients',   label: 'Patients',   Icon: Users },
+  { key: 'attendance', label: 'Attendance', Icon: CalendarCheck, adminOnly: true },
+  { key: 'expenses',   label: 'Finance',    Icon: Receipt,       adminOnly: true },
+  { key: 'reception',  label: 'Reception',  Icon: ClipboardList, staffOnly: true },
+  { key: 'queue',      label: 'Queue',      Icon: ListOrdered,   adminOnly: true },
+  { key: 'admin',      label: 'Admin',      Icon: Shield,        adminOnly: true },
 ]
 
 interface LayoutProps { page: string; setPage: (p: string) => void; children: ReactNode }
@@ -17,8 +19,11 @@ interface LayoutProps { page: string; setPage: (p: string) => void; children: Re
 export default function Layout({ page, setPage, children }: LayoutProps) {
   const { staff, logout } = useAuth()
 
-
-  const visibleNav = NAV.filter(n => !n.adminOnly || staff?.role === 'admin')
+  const visibleNav = NAV.filter(n => {
+    if (n.adminOnly && staff?.role !== 'admin') return false
+    if (n.staffOnly && staff?.role !== 'staff') return false
+    return true
+  })
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -56,7 +61,7 @@ export default function Layout({ page, setPage, children }: LayoutProps) {
         <div className="max-w-lg mx-auto flex">
           {visibleNav.map(({ key, label, Icon }) => (
             <button key={key} onClick={() => setPage(key)}
-              className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors"
+              className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors relative"
               style={{ color: page === key ? '#F6A000' : '#9ca3af' }}>
               <Icon size={20} />
               <span className="text-xs font-medium">{label}</span>

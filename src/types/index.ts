@@ -113,3 +113,17 @@ export interface DailyStats {
   expenses: number
   net_income: number
 }
+
+export interface WaitingEntry {
+  id: string
+  patient_id: string
+  patient_name?: string
+  registration_number?: string
+  date: string
+  session: Session
+  added_by: string
+  added_at: string
+  status: 'waiting' | 'done'
+  notes: string
+  created_at: string
+}
