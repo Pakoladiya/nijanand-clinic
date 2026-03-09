@@ -9,31 +9,65 @@ interface Props { patient: Patient; onClose: () => void; capturedPhoto?: string 
 export default function WelcomeImageModal({ patient, onClose, capturedPhoto }: Props) {
   const cardRef = useRef<HTMLDivElement>(null)
   const [photoBase64, setPhotoBase64] = useState<string | null>(null)
+  const [photoLoading, setPhotoLoading] = useState(false)
 
   // Use capturedPhoto directly if supplied (avoids re-fetch on new registration).
   // Otherwise download via Supabase SDK so html2canvas can embed it (avoids CORS blank).
   useEffect(() => {
-    if (capturedPhoto) { setPhotoBase64(capturedPhoto); return }
+    // Case 1: fresh registration — base64 photo passed directly, use immediately
+    if (capturedPhoto) {
+      setPhotoBase64(capturedPhoto)
+      return
+    }
+
+    // Case 2: no photo at all
     if (!patient.photo_url) return
 
-    // Extract just the filename from the full public URL
+    // Case 3: existing patient — download via Supabase Storage SDK (bypasses CORS)
+    setPhotoLoading(true)
+
+    // Extract just the filename from the full public URL (strip query params too)
     const segments = patient.photo_url.split('/')
     const fileName = segments[segments.length - 1].split('?')[0]
 
     supabase.storage.from('patient-photos').download(fileName)
       .then(({ data, error }) => {
-        if (error || !data) return
-        const reader = new FileReader()
-        reader.onloadend = () => setPhotoBase64(reader.result as string)
-        reader.readAsDataURL(data)
+        if (data && !error) {
+          // Supabase SDK succeeded — convert Blob → base64 data URL
+          const reader = new FileReader()
+          reader.onloadend = () => {
+            setPhotoBase64(reader.result as string)
+            setPhotoLoading(false)
+          }
+          reader.onerror = () => setPhotoLoading(false)
+          reader.readAsDataURL(data)
+        } else {
+          // SDK failed — fall back to plain fetch with no-cors workaround
+          return fetch(patient.photo_url!, { mode: 'cors', cache: 'no-cache' })
+            .then(r => r.blob())
+            .then(blob => {
+              const reader = new FileReader()
+              reader.onloadend = () => {
+                setPhotoBase64(reader.result as string)
+                setPhotoLoading(false)
+              }
+              reader.onerror = () => setPhotoLoading(false)
+              reader.readAsDataURL(blob)
+            })
+            .catch(() => setPhotoLoading(false))
+        }
       })
-      .catch(() => {/* silently fall back to img src display */})
+      .catch(() => setPhotoLoading(false))
   }, [patient.photo_url, capturedPhoto])
 
   async function downloadImage() {
     if (!cardRef.current) return
     const canvas = await html2canvas(cardRef.current, {
-      scale: 2, useCORS: true, backgroundColor: null,
+      scale: 2,
+      useCORS: true,
+      backgroundColor: null,
+      imageTimeout: 15000,
+      logging: false,
     })
     const link = document.createElement('a')
     link.download = `NijAadhaar-${patient.registration_number}.jpg`
@@ -44,7 +78,11 @@ export default function WelcomeImageModal({ patient, onClose, capturedPhoto }: P
   async function shareImage() {
     if (!cardRef.current) return
     const canvas = await html2canvas(cardRef.current, {
-      scale: 2, useCORS: true, backgroundColor: null,
+      scale: 2,
+      useCORS: true,
+      backgroundColor: null,
+      imageTimeout: 15000,
+      logging: false,
     })
     canvas.toBlob(async (blob) => {
       if (!blob) return
@@ -131,7 +169,17 @@ export default function WelcomeImageModal({ patient, onClose, capturedPhoto }: P
 
               {/* Left column: Photo */}
               <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                {photoBase64 ? (
+                {photoLoading ? (
+                  /* Loading spinner placeholder */
+                  <div style={{ width: 76, height: 90, borderRadius: 8,
+                    background: '#f3f4f6', border: '2.5px solid #F6A000',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 2px 8px rgba(246,160,0,0.3)' }}>
+                    <div style={{ width: 24, height: 24, border: '3px solid #F6A000',
+                      borderTopColor: 'transparent', borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite' }} />
+                  </div>
+                ) : photoBase64 ? (
                   /* Best case: base64 embedded — html2canvas renders perfectly */
                   <img src={photoBase64} alt={patient.name}
                     style={{ width: 76, height: 90, objectFit: 'cover', borderRadius: 8,
@@ -252,19 +300,35 @@ export default function WelcomeImageModal({ patient, onClose, capturedPhoto }: P
           </div>
         </div>
 
+        {/* Loading hint */}
+        {photoLoading && (
+          <p className="text-center text-xs text-amber-500 pb-1">
+            ⏳ ફોટો લોડ થઈ રહ્યો છે, રાહ જુઓ…
+          </p>
+        )}
+
         {/* Action Buttons */}
         <div className="flex gap-3 px-4 pb-4">
-          <button onClick={downloadImage}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold"
+          <button
+            onClick={downloadImage}
+            disabled={photoLoading}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-wait"
             style={{ backgroundColor: '#39A900' }}>
-            <Download size={16} /> JPG ડાઉનલોડ
+            <Download size={16} /> {photoLoading ? 'રાહ જુઓ…' : 'JPG ડાઉનલોડ'}
           </button>
-          <button onClick={shareImage}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold"
+          <button
+            onClick={shareImage}
+            disabled={photoLoading}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-wait"
             style={{ backgroundColor: '#F6A000' }}>
-            <Share2 size={16} /> શેર કરો
+            <Share2 size={16} /> {photoLoading ? 'રાહ જુઓ…' : 'શેર કરો'}
           </button>
         </div>
+
+        {/* Spinner keyframe */}
+        <style>{`
+          @keyframes spin { to { transform: rotate(360deg); } }
+        `}</style>
       </div>
     </div>
   )
