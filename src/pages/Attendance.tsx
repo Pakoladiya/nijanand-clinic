@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval,
-  isToday, parseISO } from 'date-fns'
+import { format, addDays, parseISO, isToday } from 'date-fns'
 import { ChevronLeft, ChevronRight, Sun, Moon, Plus, Trash2, History } from 'lucide-react'
 import type { Attendance, Patient, Session } from '../types'
 
@@ -12,7 +11,6 @@ interface AttendanceWithPatient extends Attendance {
 
 export default function AttendancePage() {
   const { staff } = useAuth()
-  const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [selectedSession, setSelectedSession] = useState<Session>('morning')
   const [records, setRecords] = useState<AttendanceWithPatient[]>([])
@@ -31,17 +29,18 @@ export default function AttendancePage() {
     setRecords((data as AttendanceWithPatient[]) || [])
   }, [selectedDate, selectedSession])
 
-  const loadMonthAttendance = useCallback(async () => {
-    const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd')
-    const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd')
+  // Load attendance dots for ±14 days around the selected date
+  const loadNearbyAttendance = useCallback(async () => {
+    const center = parseISO(selectedDate)
+    const start = format(addDays(center, -14), 'yyyy-MM-dd')
+    const end   = format(addDays(center,  14), 'yyyy-MM-dd')
     const { data } = await supabase
       .from('attendance').select('date').gte('date', start).lte('date', end)
-    const dates = new Set((data || []).map((r: any) => r.date))
-    setAttendedDates(dates)
-  }, [currentMonth])
+    setAttendedDates(new Set((data || []).map((r: any) => r.date)))
+  }, [selectedDate])
 
-  useEffect(() => { loadAttendance() }, [loadAttendance])
-  useEffect(() => { loadMonthAttendance() }, [loadMonthAttendance])
+  useEffect(() => { loadAttendance() },       [loadAttendance])
+  useEffect(() => { loadNearbyAttendance() }, [loadNearbyAttendance])
 
   async function searchPatients(q: string) {
     setSearchQuery(q)
@@ -68,7 +67,6 @@ export default function AttendancePage() {
     setSearchQuery('')
     setSearchResults([])
 
-    // Count all previous visits for visit number
     const { count } = await supabase
       .from('attendance').select('*', { count: 'exact', head: true })
       .eq('patient_id', patient.id)
@@ -91,7 +89,7 @@ export default function AttendancePage() {
       await logActivity(staff.id, 'ATTENDANCE_MARKED',
         `${patient.name} — ${selectedDate} ${selectedSession} (Visit #${visitNumber})${isRetroactive ? ' [RETROACTIVE]' : ''}`)
       loadAttendance()
-      loadMonthAttendance()
+      loadNearbyAttendance()
     }
     setLoading(false)
   }
@@ -103,18 +101,19 @@ export default function AttendancePage() {
     await logActivity(staff.id, 'ATTENDANCE_DELETED',
       `Removed ${patientName} from ${selectedDate} ${selectedSession}`)
     loadAttendance()
-    loadMonthAttendance()
+    loadNearbyAttendance()
   }
 
-  const days = eachDayOfInterval({
-    start: startOfMonth(currentMonth),
-    end: endOfMonth(currentMonth)
-  })
-  const firstDayOfWeek = startOfMonth(currentMonth).getDay()
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+  const isPastDate = selectedDate !== todayStr
+
+  function shiftDate(days: number) {
+    setSelectedDate(prev => format(addDays(parseISO(prev), days), 'yyyy-MM-dd'))
+  }
 
   return (
     <div className="max-w-lg mx-auto pb-8">
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-5">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#f0fce8' }}>
           <Sun size={20} style={{ color: '#39A900' }} />
         </div>
@@ -124,46 +123,72 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* Calendar */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
-        <div className="flex items-center justify-between mb-4">
-          <button onClick={() => setCurrentMonth(m => new Date(m.getFullYear(), m.getMonth() - 1))}
-            className="p-2 hover:bg-gray-100 rounded-xl">
-            <ChevronLeft size={18} />
-          </button>
-          <span className="font-semibold text-gray-800">{format(currentMonth, 'MMMM yyyy')}</span>
-          <button onClick={() => setCurrentMonth(m => new Date(m.getFullYear(), m.getMonth() + 1))}
-            className="p-2 hover:bg-gray-100 rounded-xl">
-            <ChevronRight size={18} />
-          </button>
+      {/* ── Compact Date Slider ── */}
+      <div className="bg-white rounded-2xl px-3 pt-3 pb-2 shadow-sm border border-gray-100 mb-4">
+        {/* Month label + Today jump */}
+        <div className="flex items-center justify-between mb-2 px-1">
+          <span className="text-xs font-semibold text-gray-500">
+            {format(parseISO(selectedDate), 'MMMM yyyy')}
+          </span>
+          {isPastDate && (
+            <button
+              onClick={() => setSelectedDate(todayStr)}
+              className="text-xs px-2.5 py-0.5 rounded-full font-semibold"
+              style={{ backgroundColor: '#FEF3C7', color: '#92400e' }}>
+              Today
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-gray-400 mb-2">
-          {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => <div key={d}>{d}</div>)}
-        </div>
+        {/* Arrow + 5 date chips */}
+        <div className="flex items-center gap-1">
+          <button onClick={() => shiftDate(-1)}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 flex-shrink-0 transition-colors">
+            <ChevronLeft size={17} />
+          </button>
 
-        <div className="grid grid-cols-7 gap-1">
-          {Array(firstDayOfWeek).fill(null).map((_, i) => <div key={`e-${i}`} />)}
-          {days.map(day => {
-            const dateStr = format(day, 'yyyy-MM-dd')
-            const isSelected = dateStr === selectedDate
-            const hasAttendance = attendedDates.has(dateStr)
-            const todayDay = isToday(day)
-            return (
-              <button key={dateStr} onClick={() => setSelectedDate(dateStr)}
-                className="aspect-square flex flex-col items-center justify-center rounded-xl text-sm font-medium transition-colors relative"
-                style={isSelected
-                  ? { backgroundColor: '#F6A000', color: 'white' }
-                  : todayDay
-                    ? { backgroundColor: '#FEF3C7', color: '#92400e' }
-                    : { color: '#374151' }}>
-                {format(day, 'd')}
-                {hasAttendance && !isSelected && (
-                  <span className="absolute bottom-1 w-1 h-1 rounded-full" style={{ backgroundColor: '#39A900' }} />
-                )}
-              </button>
-            )
-          })}
+          <div className="flex-1 flex gap-1">
+            {[-2, -1, 0, 1, 2].map(offset => {
+              const date    = addDays(parseISO(selectedDate), offset)
+              const dateStr = format(date, 'yyyy-MM-dd')
+              const isSelected = offset === 0
+              const isTodayDate = isToday(date)
+              const hasAtt = attendedDates.has(dateStr)
+
+              return (
+                <button key={dateStr}
+                  onClick={() => setSelectedDate(dateStr)}
+                  className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl transition-all"
+                  style={
+                    isSelected
+                      ? { backgroundColor: '#F6A000', color: 'white' }
+                      : isTodayDate
+                        ? { backgroundColor: '#FEF3C7', color: '#92400e' }
+                        : { color: '#6b7280' }
+                  }>
+                  <span className="text-xs font-medium leading-none">
+                    {format(date, 'EEE')}
+                  </span>
+                  <span className="text-base font-bold leading-none mt-0.5">
+                    {format(date, 'd')}
+                  </span>
+                  {/* Attendance dot — always reserve space to avoid layout shift */}
+                  <span
+                    className="w-1.5 h-1.5 rounded-full mt-0.5 transition-opacity"
+                    style={{
+                      backgroundColor: isSelected ? 'rgba(255,255,255,0.9)' : '#39A900',
+                      opacity: hasAtt ? 1 : 0,
+                    }}
+                  />
+                </button>
+              )
+            })}
+          </div>
+
+          <button onClick={() => shiftDate(1)}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 flex-shrink-0 transition-colors">
+            <ChevronRight size={17} />
+          </button>
         </div>
       </div>
 
@@ -183,24 +208,24 @@ export default function AttendancePage() {
         ))}
       </div>
 
-      {/* Date Info */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-4">
+      {/* Date Info bar */}
+      <div className="bg-white rounded-2xl px-4 py-3 shadow-sm border border-gray-100 mb-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs text-gray-500">Selected Date</p>
-            <p className="font-semibold text-gray-800">
-              {format(parseISO(selectedDate), 'dd MMM yyyy')}
-              {selectedDate !== format(new Date(), 'yyyy-MM-dd') && (
-                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 inline-flex items-center gap-1">
-                  <History size={10} /> Past Date
+            <p className="text-xs text-gray-400">Selected</p>
+            <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+              {format(parseISO(selectedDate), 'EEE, dd MMM yyyy')}
+              {isPastDate && (
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 inline-flex items-center gap-1">
+                  <History size={9} /> Past
                 </span>
               )}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-gray-500">{selectedSession === 'morning' ? 'Morning' : 'Evening'} Session</p>
-            <p className="font-bold text-2xl" style={{ color: '#F6A000' }}>{records.length}</p>
-            <p className="text-xs text-gray-500">patients</p>
+            <p className="text-xs text-gray-400">{selectedSession === 'morning' ? 'Morning' : 'Evening'}</p>
+            <p className="text-2xl font-bold" style={{ color: '#F6A000' }}>{records.length}</p>
+            <p className="text-xs text-gray-400 -mt-0.5">patients</p>
           </div>
         </div>
       </div>
