@@ -25,7 +25,6 @@ export default function ReceptionPage() {
   // Queue
   const [queue, setQueue] = useState<WaitingEntry[]>([])
   const [attended, setAttended] = useState<Attendance[]>([])
-  const [loading, setLoading] = useState(false)
   const [addingId, setAddingId] = useState<string | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
 

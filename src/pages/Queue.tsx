@@ -3,7 +3,7 @@ import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format } from 'date-fns'
 import { ListOrdered, Sun, Moon, Clock, CheckCircle, UserCheck, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
-import type { WaitingEntry, Attendance } from '../types'
+import type { WaitingEntry } from '../types'
 
 function getAutoSession(): 'morning' | 'evening' {
   return new Date().getHours() < 14 ? 'morning' : 'evening'
