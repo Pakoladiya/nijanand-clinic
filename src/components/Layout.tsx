@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { UserPlus, CalendarCheck, Users, Receipt, Shield, LogOut, ClipboardList, ListOrdered } from 'lucide-react'
+import { UserPlus, CalendarCheck, Users, Shield, LogOut, ClipboardList, ListOrdered } from 'lucide-react'
 
 interface NavItem { key: string; label: string; Icon: any; adminOnly?: boolean; staffOnly?: boolean }
 
@@ -8,7 +8,6 @@ const NAV: NavItem[] = [
   { key: 'register',   label: 'Register',   Icon: UserPlus,      adminOnly: true },
   { key: 'patients',   label: 'Patients',   Icon: Users },
   { key: 'attendance', label: 'Attendance', Icon: CalendarCheck, adminOnly: true },
-  { key: 'expenses',   label: 'Finance',    Icon: Receipt,       adminOnly: true },
   { key: 'reception',  label: 'Reception',  Icon: ClipboardList, staffOnly: true },
   { key: 'queue',      label: 'Queue',      Icon: ListOrdered,   adminOnly: true },
   { key: 'admin',      label: 'Admin',      Icon: Shield,        adminOnly: true },

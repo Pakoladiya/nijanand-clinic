@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
-import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield, Eye, EyeOff, Settings, Search, Trash2, User, Clock, Download } from 'lucide-react'
+import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield, Eye, EyeOff, Settings, Search, Trash2, User, Clock, Download, Receipt } from 'lucide-react'
 import type { Staff, RegisteredDevice, ActivityLog, Patient } from '../types'
+import ExpensesPage from './Expenses'
 
 export default function AdminDashboard() {
   const { staff } = useAuth()
-  const [tab, setTab] = useState<'staff' | 'devices' | 'activity' | 'patients'>('staff')
+  const [tab, setTab] = useState<'staff' | 'devices' | 'activity' | 'patients' | 'finance'>('staff')
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [devices, setDevices] = useState<RegisteredDevice[]>([])
   const [logs, setLogs] = useState<(ActivityLog & { staff: { name: string } | null })[]>([])
@@ -253,59 +254,15 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Feature Settings Card */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-5">
-        <div className="flex items-center gap-2 mb-3">
-          <Settings size={15} className="text-gray-500" />
-          <p className="text-sm font-semibold text-gray-700">Feature Settings</p>
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <p className="text-sm font-medium text-gray-700">Previous Sessions Entry</p>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {prevSessionsEnabled
-                ? 'ON — Staff can enter unlimited past sessions'
-                : 'OFF — Max 4 past sessions allowed'}
-            </p>
-          </div>
-          <button
-            onClick={togglePrevSessions}
-            disabled={settingsLoading}
-            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${prevSessionsEnabled ? 'bg-green-500' : 'bg-gray-300'} disabled:opacity-50`}
-          >
-            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${prevSessionsEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-          </button>
-        </div>
-      </div>
-
-      {/* Data Backup Card */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-5">
-        <div className="flex items-center gap-2 mb-3">
-          <Download size={15} className="text-gray-500" />
-          <p className="text-sm font-semibold text-gray-700">Data Backup</p>
-        </div>
-        <p className="text-xs text-gray-400 mb-3">
-          Downloads all patients, attendance, payments, expenses and packages as CSV files in a single ZIP.
-        </p>
-        <button
-          onClick={downloadBackup}
-          disabled={backupLoading}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60"
-          style={{ backgroundColor: backupLoading ? '#9ca3af' : '#3b82f6' }}>
-          <Download size={15} />
-          {backupLoading ? 'Preparing backup...' : 'Download Backup (.zip)'}
-        </button>
-      </div>
-
       {/* Tabs */}
-      <div className="grid grid-cols-4 gap-1.5 mb-5">
-        {([['staff', 'Staff', Users], ['patients', 'Patients', User], ['devices', 'Devices', Smartphone], ['activity', 'Activity', Activity]] as const).map(([key, label, Icon]) => (
+      <div className="grid grid-cols-5 gap-1 mb-5">
+        {([['staff', 'Staff', Users], ['patients', 'Patients', User], ['devices', 'Devices', Smartphone], ['activity', 'Logs', Activity], ['finance', 'Finance', Receipt]] as const).map(([key, label, Icon]) => (
           <button key={key} onClick={() => setTab(key as any)}
             className="flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-xs font-medium border transition-colors"
             style={tab === key
               ? { backgroundColor: '#39A900', borderColor: '#39A900', color: 'white' }
               : { backgroundColor: 'white', borderColor: '#e5e7eb', color: '#374151' }}>
-            <Icon size={14} /> {label}
+            <Icon size={13} /> {label}
           </button>
         ))}
       </div>
@@ -593,6 +550,56 @@ export default function AdminDashboard() {
           ))}
         </div>
       )}
+
+      {/* Finance Tab */}
+      {tab === 'finance' && <ExpensesPage />}
+
+      {/* ── Settings & Backup (always visible at bottom) ── */}
+      <div className="mt-6 space-y-4">
+        {/* Feature Settings Card */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2 mb-3">
+            <Settings size={15} className="text-gray-500" />
+            <p className="text-sm font-semibold text-gray-700">Feature Settings</p>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-700">Previous Sessions Entry</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {prevSessionsEnabled
+                  ? 'ON — Staff can enter unlimited past sessions'
+                  : 'OFF — Max 4 past sessions allowed'}
+              </p>
+            </div>
+            <button
+              onClick={togglePrevSessions}
+              disabled={settingsLoading}
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${prevSessionsEnabled ? 'bg-green-500' : 'bg-gray-300'} disabled:opacity-50`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${prevSessionsEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Data Backup Card */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2 mb-3">
+            <Download size={15} className="text-gray-500" />
+            <p className="text-sm font-semibold text-gray-700">Data Backup</p>
+          </div>
+          <p className="text-xs text-gray-400 mb-3">
+            Downloads all patients, attendance, payments, expenses and packages as CSV files in a single ZIP.
+          </p>
+          <button
+            onClick={downloadBackup}
+            disabled={backupLoading}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60"
+            style={{ backgroundColor: backupLoading ? '#9ca3af' : '#3b82f6' }}>
+            <Download size={15} />
+            {backupLoading ? 'Preparing backup...' : 'Download Backup (.zip)'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
