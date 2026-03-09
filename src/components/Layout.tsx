@@ -5,7 +5,7 @@ import { UserPlus, CalendarCheck, Users, Receipt, Shield, LogOut, ClipboardList,
 interface NavItem { key: string; label: string; Icon: any; adminOnly?: boolean; staffOnly?: boolean }
 
 const NAV: NavItem[] = [
-  { key: 'register',   label: 'Register',   Icon: UserPlus },
+  { key: 'register',   label: 'Register',   Icon: UserPlus,      adminOnly: true },
   { key: 'patients',   label: 'Patients',   Icon: Users },
   { key: 'attendance', label: 'Attendance', Icon: CalendarCheck, adminOnly: true },
   { key: 'expenses',   label: 'Finance',    Icon: Receipt,       adminOnly: true },
