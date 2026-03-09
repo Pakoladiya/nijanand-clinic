@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format } from 'date-fns'
-import { Search, X, ClipboardList, UserCheck, Clock, Sun, Moon, Trash2, CalendarCheck, UserPlus } from 'lucide-react'
+import { Search, X, ClipboardList, UserCheck, Clock, Sun, Moon, Trash2, CalendarCheck, UserPlus, LogOut } from 'lucide-react'
 import type { Patient, WaitingEntry, Attendance } from '../types'
 import RegisterPatient from './RegisterPatient'
 
@@ -11,7 +11,7 @@ function getAutoSession(): 'morning' | 'evening' {
 }
 
 export default function ReceptionPage() {
-  const { staff } = useAuth()
+  const { staff, logout } = useAuth()
   const today = format(new Date(), 'yyyy-MM-dd')
 
   const [session, setSession] = useState<'morning' | 'evening'>(getAutoSession())
@@ -332,6 +332,13 @@ export default function ReceptionPage() {
           )}
         </>
       )}
+
+      {/* Logout */}
+      <button
+        onClick={logout}
+        className="w-full mt-6 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold border-2 border-red-100 text-red-500 bg-white hover:bg-red-50 transition-colors">
+        <LogOut size={16} /> Log Out
+      </button>
     </div>
   )
 }
