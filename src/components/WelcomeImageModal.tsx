@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react'
 import html2canvas from 'html2canvas'
 import { Download, X, Share2 } from 'lucide-react'
+import { supabase } from '../lib/supabase'
 import type { Patient } from '../types'
 
 interface Props { patient: Patient; onClose: () => void; capturedPhoto?: string }
@@ -10,24 +11,29 @@ export default function WelcomeImageModal({ patient, onClose, capturedPhoto }: P
   const [photoBase64, setPhotoBase64] = useState<string | null>(null)
 
   // Use capturedPhoto directly if supplied (avoids re-fetch on new registration).
-  // Otherwise fetch the stored URL so html2canvas can embed it (avoids CORS blank).
+  // Otherwise download via Supabase SDK so html2canvas can embed it (avoids CORS blank).
   useEffect(() => {
     if (capturedPhoto) { setPhotoBase64(capturedPhoto); return }
     if (!patient.photo_url) return
-    fetch(patient.photo_url)
-      .then(r => r.blob())
-      .then(blob => {
+
+    // Extract just the filename from the full public URL
+    const segments = patient.photo_url.split('/')
+    const fileName = segments[segments.length - 1].split('?')[0]
+
+    supabase.storage.from('patient-photos').download(fileName)
+      .then(({ data, error }) => {
+        if (error || !data) return
         const reader = new FileReader()
         reader.onloadend = () => setPhotoBase64(reader.result as string)
-        reader.readAsDataURL(blob)
+        reader.readAsDataURL(data)
       })
-      .catch(() => setPhotoBase64(null))
+      .catch(() => {/* silently fall back to img src display */})
   }, [patient.photo_url, capturedPhoto])
 
   async function downloadImage() {
     if (!cardRef.current) return
     const canvas = await html2canvas(cardRef.current, {
-      scale: 2, useCORS: true, backgroundColor: null, allowTaint: true,
+      scale: 2, useCORS: true, backgroundColor: null,
     })
     const link = document.createElement('a')
     link.download = `NijAadhaar-${patient.registration_number}.jpg`
@@ -38,7 +44,7 @@ export default function WelcomeImageModal({ patient, onClose, capturedPhoto }: P
   async function shareImage() {
     if (!cardRef.current) return
     const canvas = await html2canvas(cardRef.current, {
-      scale: 2, useCORS: true, backgroundColor: null, allowTaint: true,
+      scale: 2, useCORS: true, backgroundColor: null,
     })
     canvas.toBlob(async (blob) => {
       if (!blob) return
