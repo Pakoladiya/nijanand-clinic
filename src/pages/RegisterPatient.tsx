@@ -364,7 +364,7 @@ export default function RegisterPatient() {
               onBlur={() => setTimeout(() => setShowAddrSugg(false), 150)}
               onFocus={() => addressSuggestions.length > 0 && setShowAddrSugg(true)}
               placeholder="Patient's address" rows={2}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 resize-none"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400 resize-none leading-tight"
               required />
             {showAddrSugg && addressSuggestions.length > 0 && (
               <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden">
