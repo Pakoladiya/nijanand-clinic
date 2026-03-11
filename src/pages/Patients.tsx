@@ -6,12 +6,30 @@ import { Search, Phone, ChevronRight } from 'lucide-react'
 import PatientProfile from './PatientProfile'
 import type { Patient } from '../types'
 
-export default function PatientsPage() {
+interface Props {
+  /** When set, auto-open this patient's profile (used for cross-page deep-link) */
+  patientIdToOpen?: string | null
+  onPatientOpened?: () => void
+}
+
+export default function PatientsPage({ patientIdToOpen, onPatientOpened }: Props) {
   const { staff } = useAuth()
   const [patients, setPatients] = useState<Patient[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Patient | null>(null)
+
+  // Auto-open a specific patient (e.g. navigated from Attendance list)
+  useEffect(() => {
+    if (!patientIdToOpen) return
+    supabase.from('patients').select('*').eq('id', patientIdToOpen).single()
+      .then(({ data }) => {
+        if (data) {
+          setSelected(data as Patient)
+          onPatientOpened?.()
+        }
+      })
+  }, [patientIdToOpen])
 
   useEffect(() => { loadPatients() }, [search])
 
@@ -43,7 +61,13 @@ export default function PatientsPage() {
     setLoading(false)
   }
 
-  if (selected) return <PatientProfile patient={selected} onBack={() => { setSelected(null); loadPatients() }} />
+  if (selected) return (
+    <PatientProfile
+      patient={selected}
+      onBack={() => { setSelected(null); loadPatients() }}
+      onPatientUpdated={(p) => setSelected(p)}
+    />
+  )
 
   function maskPhone(phone: string) {
     if (staff?.role === 'admin') return phone

@@ -17,6 +17,14 @@ export default function AdminDashboard() {
   const [patientLoading, setPatientLoading] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null)
+  const [editPatientForm, setEditPatientForm] = useState({
+    name: '', name_gujarati: '', age: '', gender: 'Male' as 'Male' | 'Female' | 'Other',
+    phone: '', address: '', chief_complaint: '',
+    fees_type: 'per_session' as 'per_session' | 'package',
+    fees_amount: '', registration_fee: '', referred_by: '',
+  })
+  const [editPatientLoading, setEditPatientLoading] = useState(false)
   const [showStaffForm, setShowStaffForm] = useState(false)
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
   const [staffForm, setStaffForm] = useState({ name: '', role: 'staff' as 'admin' | 'staff', username: '', password: '' })
@@ -96,6 +104,47 @@ export default function AdminDashboard() {
     await logActivity(staff.id, 'PATIENT_DELETED', `Deleted patient: ${patient.name} (${patient.registration_number})`)
     setDeleteLoading(false)
     setDeleteConfirmId(null)
+    loadPatients()
+  }
+
+  function startEditPatient(p: Patient) {
+    setEditingPatient(p)
+    setEditPatientForm({
+      name: p.name,
+      name_gujarati: p.name_gujarati || '',
+      age: String(p.age),
+      gender: p.gender,
+      phone: p.phone,
+      address: p.address,
+      chief_complaint: p.chief_complaint,
+      fees_type: p.fees_type,
+      fees_amount: String(p.fees_amount),
+      registration_fee: p.registration_fee != null ? String(p.registration_fee) : '',
+      referred_by: p.referred_by || '',
+    })
+    setDeleteConfirmId(null)
+  }
+
+  async function savePatientEdit() {
+    if (!staff || !editingPatient) return
+    setEditPatientLoading(true)
+    const updates = {
+      name: editPatientForm.name.trim(),
+      name_gujarati: editPatientForm.name_gujarati.trim() || null,
+      age: parseInt(editPatientForm.age) || editingPatient.age,
+      gender: editPatientForm.gender,
+      phone: editPatientForm.phone.trim(),
+      address: editPatientForm.address.trim(),
+      chief_complaint: editPatientForm.chief_complaint.trim(),
+      fees_type: editPatientForm.fees_type,
+      fees_amount: parseFloat(editPatientForm.fees_amount) || 0,
+      registration_fee: editPatientForm.registration_fee ? parseFloat(editPatientForm.registration_fee) : null,
+      referred_by: editPatientForm.referred_by.trim() || null,
+    }
+    await supabase.from('patients').update(updates).eq('id', editingPatient.id)
+    await logActivity(staff.id, 'PATIENT_UPDATED', `Updated patient: ${updates.name} (${editingPatient.registration_number})`)
+    setEditPatientLoading(false)
+    setEditingPatient(null)
     loadPatients()
   }
 
@@ -459,12 +508,114 @@ export default function AdminDashboard() {
                       <p className="font-semibold text-gray-800 truncate text-sm">{p.name}</p>
                       <p className="text-xs text-gray-400">{p.registration_number} • {p.age}y, {p.gender}</p>
                     </div>
-                    <button
-                      onClick={() => setDeleteConfirmId(deleteConfirmId === p.id ? null : p.id)}
-                      className="flex items-center gap-1 text-xs text-red-500 border border-red-200 px-2.5 py-1.5 rounded-xl hover:bg-red-50 flex-shrink-0">
-                      <Trash2 size={12} /> Delete
-                    </button>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button
+                        onClick={() => editingPatient?.id === p.id ? setEditingPatient(null) : startEditPatient(p)}
+                        className="flex items-center gap-1 text-xs text-blue-500 border border-blue-200 px-2.5 py-1.5 rounded-xl hover:bg-blue-50">
+                        <Edit2 size={12} /> Edit
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirmId(deleteConfirmId === p.id ? null : p.id)}
+                        className="flex items-center gap-1 text-xs text-red-500 border border-red-200 px-2.5 py-1.5 rounded-xl hover:bg-red-50">
+                        <Trash2 size={12} /> Delete
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Edit Form */}
+                  {editingPatient?.id === p.id && (
+                    <div className="mx-4 mb-3 bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+                      <p className="text-xs font-semibold text-blue-700">Edit Patient — {p.registration_number}</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="col-span-2">
+                          <label className="block text-xs text-gray-500 mb-1">Full Name *</label>
+                          <input value={editPatientForm.name}
+                            onChange={e => setEditPatientForm(f => ({ ...f, name: e.target.value }))}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400 bg-white" />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-xs text-gray-500 mb-1">Name (Gujarati)</label>
+                          <input value={editPatientForm.name_gujarati}
+                            onChange={e => setEditPatientForm(f => ({ ...f, name_gujarati: e.target.value }))}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400 bg-white" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Age</label>
+                          <input type="number" value={editPatientForm.age}
+                            onChange={e => setEditPatientForm(f => ({ ...f, age: e.target.value }))}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400 bg-white" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Gender</label>
+                          <select value={editPatientForm.gender}
+                            onChange={e => setEditPatientForm(f => ({ ...f, gender: e.target.value as any }))}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400 bg-white">
+                            <option>Male</option>
+                            <option>Female</option>
+                            <option>Other</option>
+                          </select>
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-xs text-gray-500 mb-1">Phone</label>
+                          <input value={editPatientForm.phone}
+                            onChange={e => setEditPatientForm(f => ({ ...f, phone: e.target.value }))}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400 bg-white" />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-xs text-gray-500 mb-1">Address</label>
+                          <input value={editPatientForm.address}
+                            onChange={e => setEditPatientForm(f => ({ ...f, address: e.target.value }))}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400 bg-white" />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-xs text-gray-500 mb-1">Chief Complaint</label>
+                          <input value={editPatientForm.chief_complaint}
+                            onChange={e => setEditPatientForm(f => ({ ...f, chief_complaint: e.target.value }))}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400 bg-white" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Fees Type</label>
+                          <select value={editPatientForm.fees_type}
+                            onChange={e => setEditPatientForm(f => ({ ...f, fees_type: e.target.value as any }))}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400 bg-white">
+                            <option value="per_session">Per Session</option>
+                            <option value="package">Package</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Fees Amount (₹)</label>
+                          <input type="number" value={editPatientForm.fees_amount}
+                            onChange={e => setEditPatientForm(f => ({ ...f, fees_amount: e.target.value }))}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400 bg-white" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Reg. Fee (₹)</label>
+                          <input type="number" value={editPatientForm.registration_fee}
+                            onChange={e => setEditPatientForm(f => ({ ...f, registration_fee: e.target.value }))}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400 bg-white" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Referred By</label>
+                          <input value={editPatientForm.referred_by}
+                            onChange={e => setEditPatientForm(f => ({ ...f, referred_by: e.target.value }))}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400 bg-white" />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={savePatientEdit}
+                          disabled={editPatientLoading || !editPatientForm.name.trim()}
+                          className="flex-1 py-2 rounded-xl text-white text-xs font-semibold bg-blue-500 disabled:opacity-60">
+                          {editPatientLoading ? 'Saving...' : 'Save Changes'}
+                        </button>
+                        <button
+                          onClick={() => setEditingPatient(null)}
+                          className="flex-1 py-2 rounded-xl text-xs border border-gray-200 text-gray-600 bg-white">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {deleteConfirmId === p.id && (
                     <div className="mx-4 mb-3 bg-red-50 border border-red-200 rounded-xl p-3">

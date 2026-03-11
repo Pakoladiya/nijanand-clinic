@@ -16,6 +16,8 @@ function AppContent() {
   const { staff, loading: authLoading } = useAuth()
   const { isAuthorised, loading: deviceLoading } = useDevice()
   const [page, setPage] = useState('register')
+  // Used when navigating from Attendance → patient profile
+  const [patientIdToOpen, setPatientIdToOpen] = useState<string | null>(null)
 
   if (authLoading || deviceLoading) {
     return (
@@ -31,15 +33,26 @@ function AppContent() {
   if (!isAuthorised) return <DeviceNotAuthorised />
   if (!staff) return <LoginPage />
 
+  /** Navigate to a page, optionally deep-linking to a specific patient */
+  function navigateTo(p: string, patientId?: string) {
+    setPage(p)
+    if (patientId) setPatientIdToOpen(patientId)
+  }
+
   const renderPage = () => {
     switch (page) {
-      case 'register': return <RegisterPatient />
-      case 'attendance': return <AttendancePage />
-      case 'patients': return <PatientsPage />
-      case 'admin': return <AdminDashboard />
-      case 'reception': return <ReceptionPage />
-      case 'queue': return <QueuePage />
-      default: return <RegisterPatient />
+      case 'register':    return <RegisterPatient />
+      case 'attendance':  return <AttendancePage navigateTo={navigateTo} />
+      case 'patients':    return (
+        <PatientsPage
+          patientIdToOpen={patientIdToOpen}
+          onPatientOpened={() => setPatientIdToOpen(null)}
+        />
+      )
+      case 'admin':       return <AdminDashboard />
+      case 'reception':   return <ReceptionPage />
+      case 'queue':       return <QueuePage />
+      default:            return <RegisterPatient />
     }
   }
 

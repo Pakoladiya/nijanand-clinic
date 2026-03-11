@@ -2,14 +2,30 @@ import { useState, useEffect } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
-import { ArrowLeft, Phone, MapPin, Calendar, CreditCard, Plus, Download, Package as PackageIcon, Trash2, Image } from 'lucide-react'
+import {
+  ArrowLeft, Phone, MapPin, Calendar, CreditCard, Plus, Download,
+  Package as PackageIcon, Trash2, Image, Pencil, X, Check,
+} from 'lucide-react'
 import WelcomeImageModal from '../components/WelcomeImageModal'
 import type { Patient, Attendance, Payment, Package } from '../types'
 
-interface Props { patient: Patient; onBack: () => void }
+const COMPLAINTS = [
+  'Back Pain', 'Neck Pain', 'Knee Pain', 'Shoulder Pain', 'Hip Pain',
+  'Ankle Pain', 'Wrist Pain', 'Elbow Pain', 'Sports Injury', 'Post-Surgery Rehab', 'Other',
+]
 
-export default function PatientProfile({ patient, onBack }: Props) {
+interface Props {
+  patient: Patient
+  onBack: () => void
+  onPatientUpdated?: (p: Patient) => void
+}
+
+export default function PatientProfile({ patient, onBack, onPatientUpdated }: Props) {
   const { staff } = useAuth()
+
+  // Local copy of patient — updated after edits so display stays fresh
+  const [localPatient, setLocalPatient] = useState<Patient>(patient)
+
   const [attendance, setAttendance] = useState<Attendance[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [packages, setPackages] = useState<Package[]>([])
@@ -21,6 +37,21 @@ export default function PatientProfile({ patient, onBack }: Props) {
   const [showWelcomeCard, setShowWelcomeCard] = useState(false)
   const [pkgForm, setPkgForm] = useState({ sessions: '15', total_amount: '' })
   const [payForm, setPayForm] = useState({ amount: '', notes: '', date: format(new Date(), 'yyyy-MM-dd') })
+
+  // ── Edit patient state ────────────────────────────────────────────────────
+  const [showEdit, setShowEdit] = useState(false)
+  const [editForm, setEditForm] = useState({
+    name: patient.name,
+    name_gujarati: patient.name_gujarati || '',
+    age: String(patient.age),
+    gender: patient.gender as 'Male' | 'Female' | 'Other',
+    phone: patient.phone,
+    address: patient.address,
+    chief_complaint: patient.chief_complaint,
+  })
+  const [editLoading, setEditLoading] = useState(false)
+  const [editError, setEditError] = useState('')
+  // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => { loadData() }, [patient.id])
 
@@ -36,9 +67,9 @@ export default function PatientProfile({ patient, onBack }: Props) {
   }
 
   const totalPaid = payments.reduce((s, p) => s + p.amount, 0)
-  const prevSessions = patient.previous_sessions || 0
+  const prevSessions = localPatient.previous_sessions || 0
   const totalVisits = attendance.length + prevSessions
-  const registrationFee = patient.registration_fee || 0
+  const registrationFee = localPatient.registration_fee || 0
   const packageTotal = packages.reduce((s, p) => s + (p.total_amount || 0), 0)
   const totalOwed = registrationFee + packageTotal
   const balance = totalPaid - totalOwed
@@ -53,7 +84,7 @@ export default function PatientProfile({ patient, onBack }: Props) {
       date: payForm.date, staff_id: staff.id, notes: payForm.notes,
     })
     await logActivity(staff.id, 'PAYMENT_ADDED',
-      `Payment ₹${amount} for ${patient.name} (${patient.registration_number})`)
+      `Payment ₹${amount} for ${localPatient.name} (${localPatient.registration_number})`)
     setShowPaymentForm(false)
     setPayForm({ amount: '', notes: '', date: format(new Date(), 'yyyy-MM-dd') })
     loadData()
@@ -70,41 +101,75 @@ export default function PatientProfile({ patient, onBack }: Props) {
       created_by: staff.id,
     })
     await logActivity(staff.id, 'PACKAGE_CREATED',
-      `Package: ${pkgForm.sessions} sessions ₹${pkgForm.total_amount} for ${patient.name}`)
+      `Package: ${pkgForm.sessions} sessions ₹${pkgForm.total_amount} for ${localPatient.name}`)
     setShowPackageForm(false)
     setPkgForm({ sessions: '15', total_amount: '' })
     loadData()
   }
 
+  // ── Save patient edits ────────────────────────────────────────────────────
+  async function saveEdit() {
+    if (!staff) return
+    setEditError('')
+    if (!editForm.name.trim()) { setEditError('Name is required'); return }
+    if (!editForm.age || isNaN(Number(editForm.age))) { setEditError('Valid age required'); return }
+    if (!editForm.phone.trim()) { setEditError('Phone is required'); return }
+
+    setEditLoading(true)
+    const updates = {
+      name: editForm.name.trim(),
+      name_gujarati: editForm.name_gujarati.trim() || null,
+      age: parseInt(editForm.age),
+      gender: editForm.gender,
+      phone: editForm.phone.trim(),
+      address: editForm.address.trim(),
+      chief_complaint: editForm.chief_complaint.trim(),
+    }
+    const { error } = await supabase.from('patients').update(updates).eq('id', patient.id)
+    if (error) {
+      setEditError('Failed to save. Please try again.')
+      setEditLoading(false)
+      return
+    }
+    const updated: Patient = { ...localPatient, ...updates }
+    setLocalPatient(updated)
+    onPatientUpdated?.(updated)
+    await logActivity(staff.id, 'PATIENT_UPDATED',
+      `Edited patient details: ${localPatient.name} (${localPatient.registration_number})`)
+    setEditLoading(false)
+    setShowEdit(false)
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   function generateVCF() {
     if (staff?.role !== 'admin') return
-    const vcf = `BEGIN:VCARD\nVERSION:3.0\nFN:${patient.name} [${patient.registration_number}]\nTEL:${patient.phone}\nNOTE:NFC Patient - ${patient.chief_complaint}\nEND:VCARD`
+    const vcf = `BEGIN:VCARD\nVERSION:3.0\nFN:${localPatient.name} [${localPatient.registration_number}]\nTEL:${localPatient.phone}\nNOTE:NFC Patient - ${localPatient.chief_complaint}\nEND:VCARD`
     const blob = new Blob([vcf], { type: 'text/vcard' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
-    link.download = `${patient.name}-${patient.registration_number}.vcf`
+    link.download = `${localPatient.name}-${localPatient.registration_number}.vcf`
     link.click()
   }
 
   async function deletePatient() {
     if (!staff) return
     setDeleteLoading(true)
-    // Delete attendance, payments, then patient
     await supabase.from('attendance').delete().eq('patient_id', patient.id)
     await supabase.from('payments').delete().eq('patient_id', patient.id)
     await supabase.from('packages').delete().eq('patient_id', patient.id)
-    // Delete photo from storage if exists
-    if (patient.photo_url) {
-      const fileName = `${patient.registration_number}.jpg`
+    if (localPatient.photo_url) {
+      const fileName = `${localPatient.registration_number}.jpg`
       await supabase.storage.from('patient-photos').remove([fileName])
     }
     await supabase.from('patients').delete().eq('id', patient.id)
-    await logActivity(staff.id, 'PATIENT_DELETED', `Deleted patient: ${patient.name} (${patient.registration_number})`)
+    await logActivity(staff.id, 'PATIENT_DELETED',
+      `Deleted patient: ${localPatient.name} (${localPatient.registration_number})`)
     setDeleteLoading(false)
     onBack()
   }
 
-  const maskPhone = (phone: string) => staff?.role === 'admin' ? phone : phone.slice(0, 5) + ' *****'
+  const maskPhone = (phone: string) =>
+    staff?.role === 'admin' ? phone : phone.slice(0, 5) + ' *****'
 
   return (
     <div className="max-w-lg mx-auto pb-8">
@@ -112,20 +177,148 @@ export default function PatientProfile({ patient, onBack }: Props) {
         <button onClick={onBack} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
           <ArrowLeft size={16} /> Back to Patients
         </button>
-        {staff?.role === 'admin' && (
-          <button onClick={() => setShowDeleteConfirm(true)}
-            className="flex items-center gap-1.5 text-xs text-red-500 border border-red-200 px-3 py-1.5 rounded-xl hover:bg-red-50 transition-colors">
-            <Trash2 size={13} /> Delete Patient
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Edit button — admin only */}
+          {staff?.role === 'admin' && !showEdit && (
+            <button onClick={() => {
+              setEditForm({
+                name: localPatient.name,
+                name_gujarati: localPatient.name_gujarati || '',
+                age: String(localPatient.age),
+                gender: localPatient.gender,
+                phone: localPatient.phone,
+                address: localPatient.address,
+                chief_complaint: localPatient.chief_complaint,
+              })
+              setEditError('')
+              setShowEdit(true)
+            }}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors">
+              <Pencil size={12} /> Edit
+            </button>
+          )}
+          {staff?.role === 'admin' && (
+            <button onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-1.5 text-xs text-red-500 border border-red-200 px-3 py-1.5 rounded-xl hover:bg-red-50 transition-colors">
+              <Trash2 size={13} /> Delete
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* ── Edit Form ── */}
+      {showEdit && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-blue-100 mb-4 space-y-3">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm font-bold text-gray-800 flex items-center gap-2">
+              <Pencil size={14} style={{ color: '#1a56db' }} /> Edit Patient Details
+            </p>
+            <button onClick={() => setShowEdit(false)} className="text-gray-400 hover:text-gray-600">
+              <X size={18} />
+            </button>
+          </div>
+
+          {editError && (
+            <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{editError}</p>
+          )}
+
+          {/* Name */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Full Name (English) *</label>
+            <input value={editForm.name}
+              onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400" />
+          </div>
+
+          {/* Gujarati Name */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Name (Gujarati)</label>
+            <input value={editForm.name_gujarati}
+              onChange={e => setEditForm(f => ({ ...f, name_gujarati: e.target.value }))}
+              placeholder="Optional"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400" />
+          </div>
+
+          {/* Age + Gender row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Age *</label>
+              <input type="number" value={editForm.age}
+                onChange={e => setEditForm(f => ({ ...f, age: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Gender *</label>
+              <select value={editForm.gender}
+                onChange={e => setEditForm(f => ({ ...f, gender: e.target.value as any }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-white">
+                <option>Male</option>
+                <option>Female</option>
+                <option>Other</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Phone */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Phone *</label>
+            <input value={editForm.phone}
+              onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400" />
+          </div>
+
+          {/* Address */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Address</label>
+            <input value={editForm.address}
+              onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400" />
+          </div>
+
+          {/* Chief Complaint */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Chief Complaint</label>
+            <div className="flex flex-wrap gap-2">
+              {COMPLAINTS.map(c => (
+                <button key={c} type="button"
+                  onClick={() => setEditForm(f => ({ ...f, chief_complaint: c }))}
+                  className="px-3 py-1 rounded-full text-xs font-medium border transition-colors"
+                  style={editForm.chief_complaint === c
+                    ? { backgroundColor: '#F6A000', borderColor: '#F6A000', color: 'white' }
+                    : { backgroundColor: 'white', borderColor: '#e5e7eb', color: '#374151' }}>
+                  {c}
+                </button>
+              ))}
+            </div>
+            {/* Free-text override if complaint not in list */}
+            <input
+              value={COMPLAINTS.includes(editForm.chief_complaint) ? '' : editForm.chief_complaint}
+              onChange={e => setEditForm(f => ({ ...f, chief_complaint: e.target.value }))}
+              placeholder="Or type custom complaint..."
+              className="mt-2 w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button onClick={saveEdit} disabled={editLoading}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-50"
+              style={{ backgroundColor: '#1a56db' }}>
+              <Check size={15} /> {editLoading ? 'Saving…' : 'Save Changes'}
+            </button>
+            <button onClick={() => setShowEdit(false)}
+              className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation */}
       {showDeleteConfirm && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
           <p className="text-sm font-semibold text-red-700 mb-1">⚠️ Delete Patient?</p>
           <p className="text-xs text-red-600 mb-3">
-            This will permanently delete <strong>{patient.name}</strong> and all their visits, payments and records. This cannot be undone.
+            This will permanently delete <strong>{localPatient.name}</strong> and all their visits, payments and records. This cannot be undone.
           </p>
           <div className="flex gap-2">
             <button onClick={deletePatient} disabled={deleteLoading}
@@ -143,22 +336,25 @@ export default function PatientProfile({ patient, onBack }: Props) {
       {/* Header */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
         <div className="flex items-start gap-4">
-          {patient.photo_url ? (
-            <img src={patient.photo_url} alt={patient.name}
+          {localPatient.photo_url ? (
+            <img src={localPatient.photo_url} alt={localPatient.name}
               className="w-20 h-20 rounded-2xl object-cover border-2" style={{ borderColor: '#F6A000' }} />
           ) : (
             <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-white font-bold text-2xl"
               style={{ backgroundColor: '#F6A000' }}>
-              {patient.name[0].toUpperCase()}
+              {localPatient.name[0].toUpperCase()}
             </div>
           )}
           <div className="flex-1">
-            <h2 className="text-xl font-bold text-gray-800">{patient.name}</h2>
-            <p className="text-sm font-semibold" style={{ color: '#F6A000' }}>{patient.registration_number}</p>
-            <p className="text-xs text-gray-400 mt-1">{patient.age} years • {patient.gender}</p>
+            <h2 className="text-xl font-bold text-gray-800">{localPatient.name}</h2>
+            {localPatient.name_gujarati && (
+              <p className="text-sm text-gray-400">{localPatient.name_gujarati}</p>
+            )}
+            <p className="text-sm font-semibold" style={{ color: '#F6A000' }}>{localPatient.registration_number}</p>
+            <p className="text-xs text-gray-400 mt-1">{localPatient.age} years • {localPatient.gender}</p>
             <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full"
               style={{ backgroundColor: '#FEF3C7', color: '#92400e' }}>
-              {patient.chief_complaint}
+              {localPatient.chief_complaint}
             </span>
           </div>
         </div>
@@ -166,7 +362,7 @@ export default function PatientProfile({ patient, onBack }: Props) {
         <div className="mt-4 space-y-2">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Phone size={14} className="text-gray-400" />
-            <span>{maskPhone(patient.phone)}</span>
+            <span>{maskPhone(localPatient.phone)}</span>
             {staff?.role === 'admin' && (
               <button onClick={generateVCF}
                 className="ml-auto text-xs px-2 py-1 rounded-lg border text-green-600 border-green-200 hover:bg-green-50 flex items-center gap-1">
@@ -184,11 +380,11 @@ export default function PatientProfile({ patient, onBack }: Props) {
           </div>
           <div className="flex items-start gap-2 text-sm text-gray-600">
             <MapPin size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
-            <span className="text-xs">{patient.address}</span>
+            <span className="text-xs">{localPatient.address}</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Calendar size={14} className="text-gray-400" />
-            <span className="text-xs">Registered: {format(parseISO(patient.created_at), 'dd MMM yyyy')}</span>
+            <span className="text-xs">Registered: {format(parseISO(localPatient.created_at), 'dd MMM yyyy')}</span>
           </div>
         </div>
       </div>
@@ -239,39 +435,42 @@ export default function PatientProfile({ patient, onBack }: Props) {
               </div>
             </div>
           )}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          {attendance.length === 0 ? (
-            <p className="text-center text-sm text-gray-400 py-8">
-              {prevSessions > 0 ? 'No sessions recorded via app yet' : 'No visits recorded yet'}
-            </p>
-          ) : attendance.map((a, i) => (
-            <div key={a.id} className="flex items-center gap-3 px-4 py-3 border-b last:border-0 border-gray-50">
-              <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                style={{ backgroundColor: i === 0 ? '#39A900' : '#e5e7eb', color: i === 0 ? 'white' : '#374151' }}>
-                {a.visit_number}
-              </span>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-700">
-                  {format(parseISO(a.date), 'dd MMM yyyy')}
-                </p>
-                <p className="text-xs text-gray-400 capitalize">
-                  {a.session} session
-                  {a.is_retroactive && <span className="ml-1 text-amber-500">• Added late</span>}
-                </p>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            {attendance.length === 0 ? (
+              <p className="text-center text-sm text-gray-400 py-8">
+                {prevSessions > 0 ? 'No sessions recorded via app yet' : 'No visits recorded yet'}
+              </p>
+            ) : attendance.map((a) => (
+              <div key={a.id} className="flex items-center gap-3 px-4 py-3 border-b last:border-0 border-gray-50">
+                <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                  style={{
+                    backgroundColor: a.visit_number === 1 ? '#f0fce8' : '#f3f4f6',
+                    color: a.visit_number === 1 ? '#39A900' : '#374151',
+                  }}>
+                  {a.visit_number}
+                </span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-700">
+                    {format(parseISO(a.date), 'dd MMM yyyy')}
+                  </p>
+                  <p className="text-xs text-gray-400 capitalize">
+                    {a.session} session
+                    {a.is_retroactive && <span className="ml-1 text-amber-500">• Added late</span>}
+                  </p>
+                </div>
+                <span className="text-xs px-2 py-1 rounded-full"
+                  style={{ backgroundColor: a.session === 'morning' ? '#FEF3C7' : '#EFF6FF', color: a.session === 'morning' ? '#92400e' : '#1e40af' }}>
+                  {a.session === 'morning' ? '☀️' : '🌙'}
+                </span>
               </div>
-              <span className="text-xs px-2 py-1 rounded-full"
-                style={{ backgroundColor: a.session === 'morning' ? '#FEF3C7' : '#EFF6FF', color: a.session === 'morning' ? '#92400e' : '#1e40af' }}>
-                {a.session === 'morning' ? '☀️' : '🌙'}
-              </span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
         </div>
       )}
 
       {/* Welcome Card Modal */}
       {showWelcomeCard && (
-        <WelcomeImageModal patient={patient} onClose={() => setShowWelcomeCard(false)} />
+        <WelcomeImageModal patient={localPatient} onClose={() => setShowWelcomeCard(false)} />
       )}
 
       {/* Fees Tab */}
@@ -394,29 +593,58 @@ export default function PatientProfile({ patient, onBack }: Props) {
             </div>
           )}
 
-          {/* Packages */}
-          {packages.map(pkg => (
-            <div key={pkg.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f0fce8' }}>
-                    <PackageIcon size={14} style={{ color: '#39A900' }} />
+          {/* Packages — sessions used = attendance records on/after package start_date */}
+          {packages.map(pkg => {
+            const pkgVisitsUsed = attendance.filter(a => a.date >= pkg.start_date).length
+            const isComplete = pkgVisitsUsed >= pkg.total_sessions
+            return (
+              <div key={pkg.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: isComplete ? '#fef2f2' : '#f0fce8' }}>
+                      <PackageIcon size={14} style={{ color: isComplete ? '#ef4444' : '#39A900' }} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{pkg.total_sessions} Sessions Package</p>
+                      <p className="text-xs text-gray-400">{format(parseISO(pkg.start_date), 'dd MMM yyyy')}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">{pkg.total_sessions} Sessions Package</p>
-                    <p className="text-xs text-gray-400">{format(parseISO(pkg.start_date), 'dd MMM yyyy')}</p>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-gray-800">₹{(pkg.total_amount || 0).toLocaleString()}</p>
+                    {isComplete ? (
+                      <p className="text-xs font-semibold text-red-400">✓ Complete</p>
+                    ) : (
+                      <p className="text-xs text-gray-400">agreed total</p>
+                    )}
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-gray-800">₹{(pkg.total_amount || 0).toLocaleString()}</p>
-                  <p className="text-xs text-gray-400">agreed total</p>
+                {/* Progress bar */}
+                <div className="pl-10">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs text-gray-400">
+                      {pkgVisitsUsed} / {pkg.total_sessions} sessions used
+                    </p>
+                    <p className="text-xs font-medium" style={{ color: isComplete ? '#ef4444' : '#39A900' }}>
+                      {Math.round((pkgVisitsUsed / pkg.total_sessions) * 100)}%
+                    </p>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-1.5">
+                    <div className="h-1.5 rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(100, (pkgVisitsUsed / pkg.total_sessions) * 100)}%`,
+                        backgroundColor: isComplete ? '#ef4444' : '#39A900',
+                      }} />
+                  </div>
+                  {isComplete && (
+                    <p className="text-xs text-red-400 mt-1">
+                      Package complete — next visit starts a new package count
+                    </p>
+                  )}
                 </div>
               </div>
-              <p className="text-xs text-gray-400 pl-10">
-                {Math.min(totalVisits, pkg.total_sessions)} / {pkg.total_sessions} sessions used
-              </p>
-            </div>
-          ))}
+            )
+          })}
 
           {/* Nudge if no package yet */}
           {packages.length === 0 && (

@@ -9,7 +9,11 @@ interface AttendanceWithPatient extends Attendance {
   patients: { name: string; registration_number: string } | null
 }
 
-export default function AttendancePage() {
+interface Props {
+  navigateTo?: (page: string, patientId?: string) => void
+}
+
+export default function AttendancePage({ navigateTo }: Props) {
   const { staff } = useAuth()
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [selectedSession, setSelectedSession] = useState<Session>('morning')
@@ -47,7 +51,8 @@ export default function AttendancePage() {
     if (q.length < 2) { setSearchResults([]); return }
     const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd')
     const [{ data: matched }, { data: yestAtt }] = await Promise.all([
-      supabase.from('patients').select('id, name, registration_number, chief_complaint')
+      supabase.from('patients')
+        .select('id, name, registration_number, chief_complaint, previous_sessions')
         .or(`name.ilike.%${q}%,registration_number.ilike.%${q}%`)
         .order('created_at', { ascending: false }).limit(20),
       supabase.from('attendance').select('patient_id').eq('date', yesterday),
@@ -67,10 +72,37 @@ export default function AttendancePage() {
     setSearchQuery('')
     setSearchResults([])
 
-    const { count } = await supabase
-      .from('attendance').select('*', { count: 'exact', head: true })
+    // ── Visit number logic ──────────────────────────────────────────────
+    // If the patient has an active package, count only visits since that
+    // package started (so each new package resets to visit #1).
+    // If no package exists yet, count all visits + any pre-app sessions.
+
+    const { data: latestPkg } = await supabase
+      .from('packages')
+      .select('id, start_date, total_sessions')
       .eq('patient_id', patient.id)
-    const visitNumber = (count || 0) + 1
+      .order('start_date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    let visitNumber: number
+    if (latestPkg) {
+      // Count visits on or after this package's start date
+      const { count: pkgCount } = await supabase
+        .from('attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('patient_id', patient.id)
+        .gte('date', latestPkg.start_date)
+      visitNumber = (pkgCount || 0) + 1
+    } else {
+      // No package yet — count all DB records + manually entered previous sessions
+      const { count: totalCount } = await supabase
+        .from('attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('patient_id', patient.id)
+      visitNumber = (totalCount || 0) + 1 + (patient.previous_sessions || 0)
+    }
+    // ───────────────────────────────────────────────────────────────────
 
     const isRetroactive = selectedDate !== format(new Date(), 'yyyy-MM-dd')
 
@@ -268,9 +300,13 @@ export default function AttendancePage() {
                 <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
                   style={{ backgroundColor: '#F6A000' }}>{i + 1}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 truncate">
+                  {/* Tapping the name goes to the patient's profile page */}
+                  <button
+                    onClick={() => navigateTo?.('patients', r.patient_id)}
+                    className="text-sm font-semibold text-gray-800 truncate text-left w-full hover:underline"
+                    style={{ color: '#1a56db' }}>
                     {r.patients?.name || 'Unknown'}
-                  </p>
+                  </button>
                   <p className="text-xs text-gray-400">
                     {r.patients?.registration_number} • Visit #{r.visit_number}
                     {r.is_retroactive && <span className="ml-1 text-amber-500">• Added late</span>}
