@@ -10,7 +10,7 @@ function getAutoSession(): 'morning' | 'evening' {
   return new Date().getHours() < 14 ? 'morning' : 'evening'
 }
 
-export default function ReceptionPage() {
+export default function ReceptionPage({ navigateTo }: { navigateTo?: (page: string, patientId?: string) => void }) {
   const { staff, logout } = useAuth()
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -280,7 +280,12 @@ export default function ReceptionPage() {
                       {i + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{entry.patient_name}</p>
+                      <button
+                        onClick={() => navigateTo?.('patients', entry.patient_id)}
+                        className="text-sm font-semibold truncate text-left hover:underline"
+                        style={{ color: '#F6A000' }}>
+                        {entry.patient_name}
+                      </button>
                       <p className="text-xs text-gray-400">{entry.registration_number}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-gray-400 flex items-center gap-1">
@@ -321,7 +326,12 @@ export default function ReceptionPage() {
                       <UserCheck size={14} style={{ color: '#39A900' }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{entry.patient_name}</p>
+                      <button
+                        onClick={() => navigateTo?.('patients', entry.patient_id)}
+                        className="text-sm font-semibold truncate text-left hover:underline"
+                        style={{ color: '#F6A000' }}>
+                        {entry.patient_name}
+                      </button>
                       <p className="text-xs text-gray-400">{entry.registration_number} · Visit #{entry.visit_number}</p>
                     </div>
                     <span className="text-xs font-bold" style={{ color: '#39A900' }}>#{i + 1}</span>

@@ -6,7 +6,7 @@ import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield,
 import type { Staff, RegisteredDevice, ActivityLog, Patient } from '../types'
 import ExpensesPage from './Expenses'
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ navigateTo }: { navigateTo?: (page: string, patientId?: string) => void }) {
   const { staff, logout } = useAuth()
   const [tab, setTab] = useState<'staff' | 'devices' | 'activity' | 'patients' | 'finance'>('staff')
   const [staffList, setStaffList] = useState<Staff[]>([])
@@ -505,7 +505,12 @@ export default function AdminDashboard() {
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-800 truncate text-sm">{p.name}</p>
+                      <button
+                        onClick={() => navigateTo?.('patients', p.id)}
+                        className="font-semibold truncate text-sm text-left hover:underline"
+                        style={{ color: '#F6A000' }}>
+                        {p.name}
+                      </button>
                       <p className="text-xs text-gray-400">{p.registration_number} • {p.age}y, {p.gender}</p>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">

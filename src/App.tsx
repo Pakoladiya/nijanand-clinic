@@ -49,9 +49,9 @@ function AppContent() {
           onPatientOpened={() => setPatientIdToOpen(null)}
         />
       )
-      case 'admin':       return <AdminDashboard />
-      case 'reception':   return <ReceptionPage />
-      case 'queue':       return <QueuePage />
+      case 'admin':       return <AdminDashboard navigateTo={navigateTo} />
+      case 'reception':   return <ReceptionPage navigateTo={navigateTo} />
+      case 'queue':       return <QueuePage navigateTo={navigateTo} />
       default:            return <RegisterPatient />
     }
   }

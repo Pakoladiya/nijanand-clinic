@@ -9,7 +9,7 @@ function getAutoSession(): 'morning' | 'evening' {
   return new Date().getHours() < 14 ? 'morning' : 'evening'
 }
 
-export default function QueuePage() {
+export default function QueuePage({ navigateTo }: { navigateTo?: (page: string, patientId?: string) => void }) {
   const { staff } = useAuth()
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -201,7 +201,12 @@ export default function QueuePage() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-base font-bold text-gray-800 truncate">{entry.patient_name}</p>
+                    <button
+                      onClick={() => navigateTo?.('patients', entry.patient_id)}
+                      className="text-base font-bold truncate text-left hover:underline"
+                      style={{ color: '#F6A000' }}>
+                      {entry.patient_name}
+                    </button>
                     <p className="text-xs text-gray-500 mt-0.5">{entry.registration_number}</p>
                     <div className="flex items-center gap-2 mt-2">
                       <span className="text-xs text-gray-500 flex items-center gap-1">
@@ -258,7 +263,12 @@ export default function QueuePage() {
                     <UserCheck size={12} style={{ color: '#39A900' }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-700 truncate">{entry.patient_name}</p>
+                    <button
+                      onClick={() => navigateTo?.('patients', entry.patient_id)}
+                      className="text-sm font-semibold truncate text-left hover:underline"
+                      style={{ color: '#F6A000' }}>
+                      {entry.patient_name}
+                    </button>
                     <p className="text-xs text-gray-400">{entry.registration_number}</p>
                   </div>
                   <span className="text-xs text-gray-400">#{i + 1}</span>
