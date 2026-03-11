@@ -246,17 +246,14 @@ export default function RegisterPatient() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Photo */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <p className="text-sm font-semibold text-gray-700 mb-4">Patient Photo</p>
-          <CameraCapture onCapture={setPhoto} captured={photo} />
-        </div>
-
         {/* Personal Info */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
           <p className="text-sm font-semibold text-gray-700">Personal Information</p>
 
-          <div className="relative">
+          {/* Name + Photo side by side */}
+          <div className="flex items-start gap-3">
+            <CameraCapture onCapture={setPhoto} captured={photo} />
+            <div className="flex-1 relative">
             <label className="block text-xs font-medium text-gray-600 mb-1">Full Name *</label>
             <input value={form.name} onChange={e => set('name', e.target.value)}
               onBlur={() => setTimeout(() => setShowNameSugg(false), 150)}
@@ -277,6 +274,7 @@ export default function RegisterPatient() {
                 ))}
               </div>
             )}
+            </div>
           </div>
 
           <div>
