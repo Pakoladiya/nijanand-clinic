@@ -26,10 +26,12 @@ function AppContent() {
 
   if (authLoading || deviceLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-full animate-pulse" style={{ backgroundColor: '#F6A000' }} />
-          <p className="text-sm text-gray-400">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #fff8ed 0%, #f0fce8 100%)' }}>
+        <div className="flex flex-col items-center gap-2">
+          <img src="/logo.png" alt="NFC Logo" className="w-20 h-20 object-contain drop-shadow-md animate-pulse" />
+          <h1 className="text-2xl font-bold text-gray-800 mt-1">Nijanand</h1>
+          <p className="text-base font-semibold" style={{ color: '#39A900' }}>Fitness Centre</p>
+          <p className="text-xs text-gray-400 mt-3">Loading...</p>
         </div>
       </div>
     )
