@@ -698,7 +698,7 @@ export default function AdminDashboard({ navigateTo }: { navigateTo?: (page: str
       )}
 
       {/* Finance Tab */}
-      {tab === 'finance' && <ExpensesPage />}
+      {tab === 'finance' && <ExpensesPage navigateTo={navigateTo} />}
 
       {/* ── Settings & Backup (always visible at bottom) ── */}
       <div className="mt-6 space-y-4">
