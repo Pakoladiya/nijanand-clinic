@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
-import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield, Eye, EyeOff, Settings, Search, Trash2, User, Clock, Download, Receipt, LogOut } from 'lucide-react'
+import { Users, Smartphone, Activity, Plus, Edit2, CheckCircle, XCircle, Shield, Eye, EyeOff, Settings, Search, Trash2, User, Clock, Download, Receipt, LogOut, FileText } from 'lucide-react'
 import type { Staff, RegisteredDevice, ActivityLog, Patient } from '../types'
 import ExpensesPage from './Expenses'
+import BillingPage from './Billing'
 
 export default function AdminDashboard({ navigateTo }: { navigateTo?: (page: string, patientId?: string) => void }) {
   const { staff, logout } = useAuth()
-  const [tab, setTab] = useState<'staff' | 'devices' | 'activity' | 'patients' | 'finance'>('staff')
+  const [tab, setTab] = useState<'staff' | 'devices' | 'activity' | 'patients' | 'finance' | 'billing'>('staff')
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [devices, setDevices] = useState<RegisteredDevice[]>([])
   const [logs, setLogs] = useState<(ActivityLog & { staff: { name: string } | null })[]>([])
@@ -294,8 +295,8 @@ export default function AdminDashboard({ navigateTo }: { navigateTo?: (page: str
   return (
     <div className="max-w-lg mx-auto pb-8">
       {/* Tabs */}
-      <div className="grid grid-cols-5 gap-1 mb-5">
-        {([['staff', 'Staff', Users], ['patients', 'Patients', User], ['devices', 'Devices', Smartphone], ['activity', 'Logs', Activity], ['finance', 'Finance', Receipt]] as const).map(([key, label, Icon]) => (
+      <div className="grid grid-cols-3 gap-1 mb-5">
+        {([['staff', 'Staff', Users], ['patients', 'Patients', User], ['devices', 'Devices', Smartphone], ['activity', 'Logs', Activity], ['finance', 'Finance', Receipt], ['billing', 'Billing', FileText]] as const).map(([key, label, Icon]) => (
           <button key={key} onClick={() => setTab(key as any)}
             className="flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-xs font-medium border transition-colors"
             style={tab === key
@@ -699,6 +700,9 @@ export default function AdminDashboard({ navigateTo }: { navigateTo?: (page: str
 
       {/* Finance Tab */}
       {tab === 'finance' && <ExpensesPage navigateTo={navigateTo} />}
+
+      {/* Billing Tab */}
+      {tab === 'billing' && <BillingPage />}
 
       {/* ── Settings & Backup (always visible at bottom) ── */}
       <div className="mt-6 space-y-4">
