@@ -245,72 +245,48 @@ export default function RegisterPatient() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3">
         {/* Personal Info */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
           <p className="text-sm font-semibold text-gray-700">Personal Information</p>
 
           {/* Name + Photo side by side */}
           <div className="flex items-start gap-3">
             <CameraCapture onCapture={setPhoto} captured={photo} />
             <div className="flex-1 relative">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Full Name *</label>
-            <input value={form.name} onChange={e => set('name', e.target.value)}
-              onBlur={() => setTimeout(() => setShowNameSugg(false), 150)}
-              onFocus={() => nameSuggestions.length > 0 && setShowNameSugg(true)}
-              placeholder="Patient's full name"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400"
-              required />
-            {showNameSugg && nameSuggestions.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden">
-                <p className="text-xs text-gray-400 px-3 pt-2 pb-1">Already registered:</p>
-                {nameSuggestions.map(s => (
-                  <button key={s} type="button"
-                    onMouseDown={() => { set('name', s); setShowNameSugg(false) }}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 border-t border-gray-50 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400 flex-shrink-0" />
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
+              <input value={form.name} onChange={e => set('name', e.target.value)}
+                onBlur={() => setTimeout(() => setShowNameSugg(false), 150)}
+                onFocus={() => nameSuggestions.length > 0 && setShowNameSugg(true)}
+                placeholder="Full Name *"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+                required />
+              {showNameSugg && nameSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden">
+                  <p className="text-xs text-gray-400 px-3 pt-2 pb-1">Already registered:</p>
+                  {nameSuggestions.map(s => (
+                    <button key={s} type="button"
+                      onMouseDown={() => { set('name', s); setShowNameSugg(false) }}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 border-t border-gray-50 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-orange-400 flex-shrink-0" />
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
-                Name (Gujarati)
-                {translitLoading && (
-                  <span className="text-orange-500 animate-pulse">⟳ Translating...</span>
-                )}
-              </label>
-              {/* Verification checkbox — appears once Gujarati field has content */}
-              {form.name_gujarati && !translitLoading && (
-                <label className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer px-2.5 py-1 rounded-lg border transition-colors ${
-                  gujaratiConfirmed
-                    ? 'bg-green-50 border-green-300 text-green-700'
-                    : 'bg-amber-50 border-amber-300 text-amber-700'
-                }`}>
-                  <input
-                    type="checkbox"
-                    checked={gujaratiConfirmed}
-                    onChange={e => setGujaratiConfirmed(e.target.checked)}
-                    className="w-3.5 h-3.5 accent-green-500"
-                  />
-                  {gujaratiConfirmed ? '✓ Verified' : 'Verify'}
-                </label>
-              )}
-            </div>
+          {/* Gujarati name — verify badge floats inside input on right */}
+          <div className="relative">
             <input
               value={form.name_gujarati}
               onChange={e => { set('name_gujarati', e.target.value); setGujaratiConfirmed(false) }}
-              placeholder="Auto-filled in Gujarati — edit if needed"
+              placeholder="Name in Gujarati (auto-filled)"
               lang="gu"
               inputMode="text"
               autoCorrect="off"
               autoComplete="off"
-              className={`w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none border transition-colors ${
+              className={`w-full rounded-xl px-3 py-2 text-sm focus:outline-none border transition-colors pr-20 ${
                 form.name_gujarati && gujaratiConfirmed
                   ? 'border-green-400 bg-green-50 focus:border-green-500'
                   : form.name_gujarati && !gujaratiConfirmed
@@ -319,33 +295,44 @@ export default function RegisterPatient() {
               }`}
               style={{ fontFamily: "'Anek Gujarati', sans-serif" }}
             />
+            {translitLoading && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-orange-400 animate-pulse text-xs">⟳</span>
+            )}
+            {form.name_gujarati && !translitLoading && (
+              <label className={`absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs font-medium cursor-pointer px-2 py-0.5 rounded-lg border transition-colors ${
+                gujaratiConfirmed
+                  ? 'bg-green-50 border-green-300 text-green-700'
+                  : 'bg-amber-50 border-amber-300 text-amber-700'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={gujaratiConfirmed}
+                  onChange={e => setGujaratiConfirmed(e.target.checked)}
+                  className="w-3 h-3 accent-green-500"
+                />
+                {gujaratiConfirmed ? '✓' : 'Verify'}
+              </label>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Age *</label>
-              <input type="number" value={form.age} onChange={e => set('age', e.target.value)}
-                placeholder="Age" min="1" max="120"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400"
-                required />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Gender *</label>
-              <select value={form.gender} onChange={e => set('gender', e.target.value as any)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400">
-                <option>Male</option>
-                <option>Female</option>
-                <option>Other</option>
-              </select>
-            </div>
+            <input type="number" value={form.age} onChange={e => set('age', e.target.value)}
+              placeholder="Age *" min="1" max="120"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+              required />
+            <select value={form.gender} onChange={e => set('gender', e.target.value as any)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400">
+              <option>Male</option>
+              <option>Female</option>
+              <option>Other</option>
+            </select>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Phone Number *</label>
             <input type="tel" value={form.phone}
               onChange={e => { const v = e.target.value.replace(/\D/g, '').slice(0, 10); set('phone', v) }}
-              placeholder="10-digit mobile number"
-              className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none transition-colors ${
+              placeholder="Phone * (10 digits)"
+              className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none transition-colors ${
                 form.phone.length > 0 && form.phone.length !== 10
                   ? 'border-red-400 focus:border-red-400'
                   : 'border-gray-200 focus:border-orange-400'
@@ -359,11 +346,10 @@ export default function RegisterPatient() {
           </div>
 
           <div className="relative">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Address *</label>
             <textarea value={form.address} onChange={e => set('address', e.target.value)}
               onBlur={() => setTimeout(() => setShowAddrSugg(false), 150)}
               onFocus={() => addressSuggestions.length > 0 && setShowAddrSugg(true)}
-              placeholder="Patient's address" rows={2}
+              placeholder="Address *" rows={2}
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400 resize-none leading-tight"
               required />
             {showAddrSugg && addressSuggestions.length > 0 && (
@@ -381,20 +367,15 @@ export default function RegisterPatient() {
             )}
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Ref. By</label>
-            <input value={form.referred_by} onChange={e => set('referred_by', e.target.value)}
-              placeholder="Referred by (optional)" list="ref-suggestions"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
-            <datalist id="ref-suggestions">
-              {refSuggestions.map(s => <option key={s} value={s} />)}
-            </datalist>
-          </div>
+          <input value={form.referred_by} onChange={e => set('referred_by', e.target.value)}
+            placeholder="Referred by (optional)" list="ref-suggestions"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400" />
+          <datalist id="ref-suggestions">
+            {refSuggestions.map(s => <option key={s} value={s} />)}
+          </datalist>
 
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-            <label className="block text-xs font-medium text-amber-800 mb-1">
-              Previous Sessions (for existing patients only)
-            </label>
+            <p className="text-xs font-medium text-amber-800 mb-1.5">Previous Sessions (existing patients only)</p>
             <input type="number" min="0" max={prevSessionsEnabled ? 9999 : 4}
               value={form.previous_sessions}
               onChange={e => {
@@ -403,7 +384,7 @@ export default function RegisterPatient() {
                 set('previous_sessions', String(Math.min(val, max)))
               }}
               placeholder="0"
-              className="w-full border border-amber-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 bg-white" />
+              className="w-full border border-amber-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400 bg-white" />
             <p className="text-xs text-amber-600 mt-1">
               {prevSessionsEnabled
                 ? 'Feature ON — Enter any number of past sessions.'
@@ -413,7 +394,7 @@ export default function RegisterPatient() {
         </div>
 
         {/* Chief Complaint */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-700">Chief Complaint</p>
             {selectedComplaints.length > 0 && (
@@ -435,12 +416,12 @@ export default function RegisterPatient() {
           {selectedComplaints.includes('Other') && (
             <input value={otherComplaint} onChange={e => setOtherComplaint(e.target.value)}
               placeholder="Describe complaint"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400" />
           )}
         </div>
 
         {/* First Day Charge */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-3">
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-700">First Day Charge</p>
             <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-600">Auto-recorded as payment</span>
@@ -450,7 +431,7 @@ export default function RegisterPatient() {
             <input type="number" value={form.first_day_fee}
               onChange={e => set('first_day_fee', e.target.value)}
               placeholder="100"
-              className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
+              className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400" />
           </div>
           <p className="text-xs text-gray-400">Package deal (10 / 15 / 30 sessions) can be added from the patient's profile after registration.</p>
         </div>
