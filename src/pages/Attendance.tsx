@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format, addDays, parseISO, isToday } from 'date-fns'
-import { ChevronLeft, ChevronRight, Sun, Moon, Plus, Trash2, History } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Sun, Moon, Plus, Trash2, History, IndianRupee, X } from 'lucide-react'
 import type { Attendance, Patient, Session } from '../types'
 
 interface AttendanceWithPatient extends Attendance {
@@ -22,6 +22,11 @@ export default function AttendancePage({ navigateTo }: Props) {
   const [searchResults, setSearchResults] = useState<Patient[]>([])
   const [loading, setLoading] = useState(false)
   const [attendedDates, setAttendedDates] = useState<Set<string>>(new Set())
+
+  // ── Payment prompt (today only) ──
+  const [pendingPayPatient, setPendingPayPatient] = useState<Patient | null>(null)
+  const [payAmount, setPayAmount] = useState('')
+  const [payType, setPayType] = useState('per_session')
 
   const loadAttendance = useCallback(async () => {
     const { data } = await supabase
@@ -52,7 +57,7 @@ export default function AttendancePage({ navigateTo }: Props) {
     const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd')
     const [{ data: matched }, { data: yestAtt }] = await Promise.all([
       supabase.from('patients')
-        .select('id, name, registration_number, chief_complaint, previous_sessions')
+        .select('id, name, registration_number, chief_complaint, previous_sessions, fees_amount, fees_type')
         .or(`name.ilike.%${q}%,registration_number.ilike.%${q}%`)
         .order('created_at', { ascending: false }).limit(20),
       supabase.from('attendance').select('patient_id').eq('date', yesterday),
@@ -66,11 +71,12 @@ export default function AttendancePage({ navigateTo }: Props) {
     setSearchResults(sorted.slice(0, 8) as Patient[])
   }
 
-  async function markAttendance(patient: Patient) {
+  async function markAttendance(patient: Patient, payAmt = 0, pType = 'per_session') {
     if (!staff) return
     setLoading(true)
     setSearchQuery('')
     setSearchResults([])
+    setPendingPayPatient(null)
 
     // ── Visit number logic ──────────────────────────────────────────────
     // If the patient has an active package, count only visits since that
@@ -118,8 +124,20 @@ export default function AttendancePage({ navigateTo }: Props) {
     })
 
     if (!error) {
+      // Record payment for today's entries only
+      if (!isRetroactive && payAmt > 0) {
+        await supabase.from('payments').insert({
+          patient_id:   patient.id,
+          amount:       payAmt,
+          payment_type: pType,
+          date:         selectedDate,
+          staff_id:     staff.id,
+          notes:        `${selectedSession} session — Visit #${visitNumber}`,
+        })
+      }
+      const payNote = !isRetroactive && payAmt > 0 ? ` · ₹${payAmt} collected` : ''
       await logActivity(staff.id, 'ATTENDANCE_MARKED',
-        `${patient.name} — ${selectedDate} ${selectedSession} (Visit #${visitNumber})${isRetroactive ? ' [RETROACTIVE]' : ''}`)
+        `${patient.name} — ${selectedDate} ${selectedSession} (Visit #${visitNumber})${isRetroactive ? ' [RETROACTIVE]' : ''}${payNote}`)
       loadAttendance()
       loadNearbyAttendance()
     }
@@ -273,7 +291,19 @@ export default function AttendancePage({ navigateTo }: Props) {
           <div className="absolute left-4 right-4 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 overflow-hidden">
             {searchResults.map(p => (
               <button key={p.id} type="button"
-                onClick={() => markAttendance(p)}
+                onClick={() => {
+                  setSearchResults([])
+                  setSearchQuery('')
+                  if (!isPastDate) {
+                    // Today — show payment prompt
+                    setPendingPayPatient(p)
+                    setPayAmount(p.fees_amount ? String(p.fees_amount) : '')
+                    setPayType((p as any).fees_type ?? 'per_session')
+                  } else {
+                    // Past date — mark directly, no payment
+                    markAttendance(p, 0, 'per_session')
+                  }
+                }}
                 disabled={loading}
                 className="w-full text-left px-4 py-3 hover:bg-orange-50 flex items-center justify-between border-b last:border-0 border-gray-100">
                 <div>
@@ -283,6 +313,60 @@ export default function AttendancePage({ navigateTo }: Props) {
                 <Plus size={16} style={{ color: '#F6A000' }} />
               </button>
             ))}
+          </div>
+        )}
+
+        {/* ── Inline payment prompt ── */}
+        {pendingPayPatient && (
+          <div className="mt-3 bg-orange-50 rounded-xl p-3 border border-orange-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-700 flex items-center gap-1">
+                <IndianRupee size={12} /> Collect Payment — {pendingPayPatient.name}
+              </p>
+              <button onClick={() => setPendingPayPatient(null)} className="text-gray-400 hover:text-gray-600">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-gray-500">₹</span>
+              <input
+                type="number"
+                value={payAmount}
+                onChange={e => setPayAmount(e.target.value)}
+                placeholder="0"
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold focus:outline-none focus:border-orange-400 bg-white"
+              />
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              {[
+                { value: 'per_session', label: 'Session' },
+                { value: 'package', label: 'Package' },
+                { value: 'advance', label: 'Advance' },
+              ].map(t => (
+                <button key={t.value} onClick={() => setPayType(t.value)}
+                  className="px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all"
+                  style={payType === t.value
+                    ? { backgroundColor: '#F6A000', borderColor: '#F6A000', color: 'white' }
+                    : { backgroundColor: 'white', borderColor: '#e5e7eb', color: '#6b7280' }}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => markAttendance(pendingPayPatient, 0, 'per_session')}
+                disabled={loading}
+                className="flex-1 py-2 rounded-xl text-xs font-semibold border border-gray-200 text-gray-500 bg-white active:scale-95">
+                Skip Payment
+              </button>
+              <button
+                onClick={() => markAttendance(pendingPayPatient, parseFloat(payAmount) || 0, payType)}
+                disabled={loading}
+                className="py-2 px-4 rounded-xl text-xs font-bold text-white active:scale-95 flex items-center gap-1"
+                style={{ backgroundColor: '#39A900', flex: 2 }}>
+                <Plus size={12} /> Add & Save Payment
+              </button>
+            </div>
           </div>
         )}
       </div>

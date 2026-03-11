@@ -2,11 +2,17 @@ import { useState, useEffect } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format } from 'date-fns'
-import { ListOrdered, Sun, Moon, Clock, CheckCircle, UserCheck, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
+import { ListOrdered, Sun, Moon, Clock, CheckCircle, UserCheck, ChevronDown, ChevronUp, RefreshCw, IndianRupee, X } from 'lucide-react'
 import type { WaitingEntry } from '../types'
 
 function getAutoSession(): 'morning' | 'evening' {
   return new Date().getHours() < 14 ? 'morning' : 'evening'
+}
+
+interface PaymentPrompt {
+  entry: WaitingEntry
+  defaultAmount: number
+  defaultType: string
 }
 
 export default function QueuePage({ navigateTo }: { navigateTo?: (page: string, patientId?: string) => void }) {
@@ -19,6 +25,11 @@ export default function QueuePage({ navigateTo }: { navigateTo?: (page: string, 
   const [markingId, setMarkingId] = useState<string | null>(null)
   const [showDone, setShowDone] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(new Date())
+
+  // ── Payment collection state ──
+  const [payPrompt, setPayPrompt] = useState<PaymentPrompt | null>(null)
+  const [payAmount, setPayAmount] = useState('')
+  const [payType, setPayType] = useState('per_session')
 
   // ── Load + real-time subscription ──
   useEffect(() => {
@@ -38,7 +49,7 @@ export default function QueuePage({ navigateTo }: { navigateTo?: (page: string, 
   async function loadQueue() {
     const { data } = await supabase
       .from('waiting_list')
-      .select('*, patients(name, registration_number)')
+      .select('*, patients(name, registration_number, fees_amount, fees_type)')
       .eq('date', today)
       .eq('session', session)
       .order('added_at')
@@ -47,17 +58,31 @@ export default function QueuePage({ navigateTo }: { navigateTo?: (page: string, 
       ...row,
       patient_name: row.patients?.name,
       registration_number: row.patients?.registration_number,
+      fees_amount: row.patients?.fees_amount ?? 0,
+      fees_type: row.patients?.fees_type ?? 'per_session',
     }))
 
-    setWaiting(rows.filter((r: WaitingEntry) => r.status === 'waiting'))
-    setDone(rows.filter((r: WaitingEntry) => r.status === 'done'))
+    setWaiting(rows.filter((r: any) => r.status === 'waiting'))
+    setDone(rows.filter((r: any) => r.status === 'done'))
     setLastUpdated(new Date())
   }
 
-  // ── Mark patient as attended ──
-  async function markAttended(entry: WaitingEntry) {
+  // ── Open payment prompt ──
+  function openPayPrompt(entry: any) {
+    setPayPrompt({
+      entry,
+      defaultAmount: entry.fees_amount ?? 0,
+      defaultType: entry.fees_type ?? 'per_session',
+    })
+    setPayAmount(entry.fees_amount ? String(entry.fees_amount) : '')
+    setPayType(entry.fees_type ?? 'per_session')
+  }
+
+  // ── Mark patient as attended (with optional payment) ──
+  async function markAttended(entry: WaitingEntry, amount: number, type: string | null) {
     if (!staff) return
     setMarkingId(entry.id)
+    setPayPrompt(null)
 
     try {
       // 1. Get visit number
@@ -77,17 +102,29 @@ export default function QueuePage({ navigateTo }: { navigateTo?: (page: string, 
         marked_by:     staff.id,
         is_retroactive: false,
       })
-
       if (attErr) throw attErr
 
-      // 3. Mark done in queue
+      // 3. Record payment if amount entered
+      if (amount > 0 && type) {
+        await supabase.from('payments').insert({
+          patient_id:   entry.patient_id,
+          amount,
+          payment_type: type,
+          date:         today,
+          staff_id:     staff.id,
+          notes:        `${entry.session} session — Visit #${visitNumber}`,
+        })
+      }
+
+      // 4. Mark done in queue
       await supabase.from('waiting_list')
         .update({ status: 'done' })
         .eq('id', entry.id)
 
-      // 4. Log activity
+      // 5. Log activity
+      const payNote = amount > 0 ? ` · ₹${amount} collected` : ' · No payment'
       await logActivity(staff.id, 'ATTENDANCE_MARKED',
-        `Marked ${entry.patient_name} (${entry.registration_number}) as attended — ${entry.session} session, Visit #${visitNumber}`)
+        `Marked ${entry.patient_name} (${entry.registration_number}) as attended — ${entry.session} session, Visit #${visitNumber}${payNote}`)
 
       loadQueue()
     } catch (err: any) {
@@ -187,12 +224,13 @@ export default function QueuePage({ navigateTo }: { navigateTo?: (page: string, 
         </div>
       ) : (
         <div className="space-y-3 mb-5">
-          {waiting.map((entry, i) => {
+          {waiting.map((entry: any, i) => {
             const colors = urgencyColor(entry.added_at)
+            const isPrompting = payPrompt?.entry.id === entry.id
             return (
               <div key={entry.id}
                 className="rounded-2xl p-4 border-2 transition-all"
-                style={{ backgroundColor: colors.bg, borderColor: colors.border }}>
+                style={{ backgroundColor: colors.bg, borderColor: isPrompting ? '#F6A000' : colors.border }}>
                 <div className="flex items-start gap-3">
                   {/* Position */}
                   <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 bg-white shadow-sm">
@@ -220,18 +258,81 @@ export default function QueuePage({ navigateTo }: { navigateTo?: (page: string, 
                   </div>
                 </div>
 
-                {/* Mark attended button */}
-                <button
-                  onClick={() => markAttended(entry)}
-                  disabled={markingId === entry.id}
-                  className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95"
-                  style={{ backgroundColor: markingId === entry.id ? '#9ca3af' : '#39A900' }}>
-                  {markingId === entry.id ? (
-                    <><RefreshCw size={14} className="animate-spin" /> Marking...</>
-                  ) : (
-                    <><CheckCircle size={14} /> Mark Attended</>
-                  )}
-                </button>
+                {/* ── Payment prompt (inline) ── */}
+                {isPrompting ? (
+                  <div className="mt-3 bg-white rounded-xl p-3 border border-orange-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-gray-600 flex items-center gap-1">
+                        <IndianRupee size={12} /> Collect Payment
+                      </p>
+                      <button onClick={() => setPayPrompt(null)} className="text-gray-400 hover:text-gray-600">
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    {/* Amount input */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-gray-500">₹</span>
+                      <input
+                        type="number"
+                        value={payAmount}
+                        onChange={e => setPayAmount(e.target.value)}
+                        placeholder="0"
+                        className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold focus:outline-none focus:border-orange-400"
+                      />
+                    </div>
+
+                    {/* Payment type pills */}
+                    <div className="flex gap-1.5 flex-wrap">
+                      {[
+                        { value: 'per_session', label: 'Session' },
+                        { value: 'package', label: 'Package' },
+                        { value: 'advance', label: 'Advance' },
+                      ].map(t => (
+                        <button key={t.value} onClick={() => setPayType(t.value)}
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all"
+                          style={payType === t.value
+                            ? { backgroundColor: '#F6A000', borderColor: '#F6A000', color: 'white' }
+                            : { backgroundColor: 'white', borderColor: '#e5e7eb', color: '#6b7280' }}>
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => markAttended(entry, 0, null)}
+                        disabled={markingId === entry.id}
+                        className="flex-1 py-2 rounded-xl text-xs font-semibold border border-gray-200 text-gray-500 bg-white active:scale-95">
+                        Skip Payment
+                      </button>
+                      <button
+                        onClick={() => markAttended(entry, parseFloat(payAmount) || 0, payType)}
+                        disabled={markingId === entry.id}
+                        className="flex-2 px-4 py-2 rounded-xl text-xs font-bold text-white active:scale-95 flex items-center justify-center gap-1"
+                        style={{ backgroundColor: '#39A900', flex: 2 }}>
+                        {markingId === entry.id
+                          ? <><RefreshCw size={12} className="animate-spin" /> Saving...</>
+                          : <><CheckCircle size={12} /> Confirm & Mark</>
+                        }
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Normal mark attended button */
+                  <button
+                    onClick={() => openPayPrompt(entry)}
+                    disabled={markingId === entry.id}
+                    className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95"
+                    style={{ backgroundColor: markingId === entry.id ? '#9ca3af' : '#39A900' }}>
+                    {markingId === entry.id ? (
+                      <><RefreshCw size={14} className="animate-spin" /> Marking...</>
+                    ) : (
+                      <><CheckCircle size={14} /> Mark Attended</>
+                    )}
+                  </button>
+                )}
               </div>
             )
           })}
@@ -255,7 +356,7 @@ export default function QueuePage({ navigateTo }: { navigateTo?: (page: string, 
 
           {showDone && (
             <div className="border-t border-gray-100">
-              {done.map((entry, i) => (
+              {done.map((entry: any, i) => (
                 <div key={entry.id}
                   className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
                   <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
