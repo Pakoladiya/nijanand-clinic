@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { DeviceProvider, useDevice } from './context/DeviceContext'
 import LoginPage from './pages/LoginPage'
@@ -15,9 +15,14 @@ import './index.css'
 function AppContent() {
   const { staff, loading: authLoading } = useAuth()
   const { isAuthorised, loading: deviceLoading } = useDevice()
-  const [page, setPage] = useState('register')
+  const [page, setPage] = useState(() => localStorage.getItem('nfc_current_page') || 'register')
   // Used when navigating from Attendance → patient profile
   const [patientIdToOpen, setPatientIdToOpen] = useState<string | null>(null)
+
+  // Persist current page so refresh stays on the same page
+  useEffect(() => {
+    localStorage.setItem('nfc_current_page', page)
+  }, [page])
 
   if (authLoading || deviceLoading) {
     return (
