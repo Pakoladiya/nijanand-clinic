@@ -6,3 +6,10 @@ body {
   background-color: #f3f4f6;
   min-height: 100vh;
 }
+
+/* Darker placeholder text for readability in low light */
+input::placeholder,
+textarea::placeholder {
+  color: #4b5563; /* gray-600 */
+  opacity: 1;
+}
