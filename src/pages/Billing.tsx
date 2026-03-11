@@ -31,12 +31,23 @@ function toWords(n: number): string {
   return r.trim() + ' Only'
 }
 
+const inp = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400'
+
 export default function BillingPage() {
   const [search, setSearch]           = useState('')
   const [suggestions, setSuggestions] = useState<Patient[]>([])
   const [patient, setPatient]         = useState<Patient | null>(null)
+
+  // Editable bill fields — auto-filled from patient, staff can change before generating
+  const [billDate, setBillDate]       = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [name, setName]               = useState('')
+  const [age, setAge]                 = useState('')
+  const [gender, setGender]           = useState('Male')
+  const [refBy, setRefBy]             = useState('')
+  const [joiningDate, setJoiningDate] = useState('')
   const [diagnosis, setDiagnosis]     = useState('')
-  const [rows, setRows]               = useState<ChargeRow[]>([
+
+  const [rows, setRows] = useState<ChargeRow[]>([
     { label: 'A) Assessment Charge', chargePerDay: '', days: '', visitsPerDay: '' },
     { label: 'B) Treatment Charge',  chargePerDay: '', days: '', visitsPerDay: '' },
     { label: 'C) Other Charge',      chargePerDay: '', days: '', visitsPerDay: '' },
@@ -53,8 +64,24 @@ export default function BillingPage() {
     setSuggestions(data || [])
   }
 
+  function selectPatient(p: Patient) {
+    setPatient(p)
+    setName(p.name)
+    setAge(String(p.age))
+    setGender(p.gender)
+    setRefBy(p.referred_by || 'Self')
+    setJoiningDate(p.created_at ? format(parseISO(p.created_at), 'yyyy-MM-dd') : '')
+    setSuggestions([])
+    setSearch('')
+  }
+
+  function clearPatient() {
+    setPatient(null)
+    setName(''); setAge(''); setGender('Male')
+    setRefBy(''); setJoiningDate(''); setDiagnosis('')
+  }
+
   async function handleGenerate() {
-    if (!patient) return
     setBusy(true)
     const { data } = await supabase.from('clinic_settings')
       .select('value').eq('key', 'last_bill_number').single()
@@ -74,12 +101,16 @@ export default function BillingPage() {
 
   const total = rows.reduce((s, r) => s + rowAmt(r), 0)
 
+  // Format date for display on bill (dd-MM-yyyy)
+  function fmtDate(val: string) {
+    try { return val ? format(parseISO(val), 'dd-MM-yyyy') : '—' } catch { return val }
+  }
+
   return (
     <div className="space-y-3">
-      {/* Patient + Diagnosis */}
+      {/* Patient search */}
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
         <p className="text-sm font-semibold text-gray-700">Patient</p>
-
         {!patient ? (
           <div className="relative">
             <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2">
@@ -92,7 +123,7 @@ export default function BillingPage() {
               <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 overflow-hidden">
                 {suggestions.map(p => (
                   <button key={p.id} type="button"
-                    onMouseDown={() => { setPatient(p); setSuggestions([]); setSearch('') }}
+                    onMouseDown={() => selectPatient(p)}
                     className="w-full text-left px-3 py-2 text-sm hover:bg-orange-50 border-t border-gray-50 first:border-0">
                     <span className="font-medium text-gray-800">{p.name}</span>
                     <span className="text-gray-400 text-xs ml-2">{p.registration_number}</span>
@@ -103,25 +134,64 @@ export default function BillingPage() {
           </div>
         ) : (
           <div className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-xl px-3 py-2">
-            <div>
-              <p className="text-sm font-semibold text-gray-800">{patient.name}</p>
-              <p className="text-xs text-gray-500">{patient.registration_number} · {patient.age} yrs · {patient.gender}</p>
-            </div>
-            <button onClick={() => { setPatient(null); setDiagnosis('') }} className="text-gray-400 p-1">
-              <X size={15} />
-            </button>
+            <p className="text-sm font-semibold text-gray-800">{patient.name}
+              <span className="text-xs font-normal text-gray-500 ml-2">{patient.registration_number}</span>
+            </p>
+            <button onClick={clearPatient} className="text-gray-400 p-1"><X size={15} /></button>
           </div>
         )}
+      </div>
 
-        <input value={diagnosis} onChange={e => setDiagnosis(e.target.value)}
-          placeholder="Diagnosis"
-          className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-orange-400" />
+      {/* Bill details — all editable */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-2">
+        <p className="text-sm font-semibold text-gray-700 mb-1">Bill Details</p>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Bill Date</p>
+            <input type="date" value={billDate} onChange={e => setBillDate(e.target.value)} className={inp} />
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Joining Date</p>
+            <input type="date" value={joiningDate} onChange={e => setJoiningDate(e.target.value)} className={inp} />
+          </div>
+        </div>
+
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Patient Name</p>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="Patient name" className={inp} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Age</p>
+            <input type="number" value={age} onChange={e => setAge(e.target.value)} placeholder="Age" className={inp} />
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Gender</p>
+            <select value={gender} onChange={e => setGender(e.target.value)} className={inp}>
+              <option>Male</option>
+              <option>Female</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Referred By</p>
+          <input value={refBy} onChange={e => setRefBy(e.target.value)} placeholder="Self" className={inp} />
+        </div>
+
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Diagnosis</p>
+          <input value={diagnosis} onChange={e => setDiagnosis(e.target.value)} placeholder="Diagnosis" className={inp} />
+        </div>
       </div>
 
       {/* Charges */}
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
         <p className="text-sm font-semibold text-gray-700 mb-3">Charges</p>
-        <div className="grid grid-cols-4 gap-1 mb-2 px-0.5">
+        <div className="grid grid-cols-4 gap-1 mb-2">
           {['₹/Day', 'Days', 'Visits', 'Amount'].map(h => (
             <p key={h} className="text-xs text-center font-medium text-gray-400">{h}</p>
           ))}
@@ -155,16 +225,20 @@ export default function BillingPage() {
         </div>
       </div>
 
-      <button onClick={handleGenerate} disabled={!patient || busy}
+      <button onClick={handleGenerate} disabled={!name || busy}
         className="w-full py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
         style={{ backgroundColor: '#39A900' }}>
         <Printer size={18} />
         {busy ? 'Preparing...' : 'Generate & Share Bill'}
       </button>
 
-      {showPreview && patient && billNo && (
+      {showPreview && billNo && (
         <BillPreview
-          patient={patient} billNo={billNo} diagnosis={diagnosis}
+          billNo={billNo}
+          billDate={fmtDate(billDate)}
+          name={name} age={age} gender={gender}
+          refBy={refBy} joiningDate={fmtDate(joiningDate)}
+          diagnosis={diagnosis}
           rows={rows} total={total}
           onClose={() => setShowPreview(false)}
         />
@@ -173,35 +247,37 @@ export default function BillingPage() {
   )
 }
 
-function BillPreview({ patient, billNo, diagnosis, rows, total, onClose }: {
-  patient: Patient; billNo: number; diagnosis: string
-  rows: ChargeRow[]; total: number; onClose: () => void
+function BillPreview({ billNo, billDate, name, age, gender, refBy, joiningDate, diagnosis, rows, total, onClose }: {
+  billNo: number; billDate: string
+  name: string; age: string; gender: string
+  refBy: string; joiningDate: string; diagnosis: string
+  rows: ChargeRow[]; total: number
+  onClose: () => void
 }) {
-  const today       = format(new Date(), 'dd-MM-yyyy')
-  const joiningDate = patient.created_at ? format(parseISO(patient.created_at), 'dd-MM-yyyy') : '—'
-
-  const cellStyle: React.CSSProperties = {
-    border: '1px solid #333', padding: '5px 8px', textAlign: 'center',
-  }
-  const cellLeft: React.CSSProperties = {
-    ...cellStyle, textAlign: 'left', fontWeight: 'bold',
-  }
+  const cell: React.CSSProperties = { border: '1px solid #333', padding: '5px 8px', textAlign: 'center' }
+  const cellL: React.CSSProperties = { ...cell, textAlign: 'left', fontWeight: 'bold' }
 
   return (
     <>
       <style>{`
         @media print {
+          @page { size: A4 portrait; margin: 0; }
           body * { visibility: hidden !important; }
           .bill-printable, .bill-printable * { visibility: visible !important; }
           .bill-printable {
-            position: fixed !important; top: 0; left: 0;
-            width: 100%; padding: 28px; background: white;
+            position: fixed !important;
+            top: 0; left: 0;
+            width: 210mm;
+            min-height: 297mm;
+            padding: 2in 14mm 14mm 14mm;
+            background: white;
+            box-sizing: border-box;
           }
         }
       `}</style>
 
-      <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#e5e7eb' }}>
-        {/* Top action bar */}
+      <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#d1d5db' }}>
+        {/* Action bar */}
         <div className="bill-no-print flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 shadow-sm">
           <button onClick={onClose} className="flex items-center gap-1.5 text-sm text-gray-600">
             <X size={18} /> Close
@@ -214,34 +290,46 @@ function BillPreview({ patient, billNo, diagnosis, rows, total, onClose }: {
           </button>
         </div>
 
-        {/* Scrollable bill paper */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="bill-printable bg-white shadow-md mx-auto p-8"
-            style={{ fontFamily: 'Arial, sans-serif', fontSize: '13px', color: '#000', lineHeight: '1.7', maxWidth: '680px' }}>
+        {/* Scrollable A4 preview */}
+        <div className="flex-1 overflow-y-auto py-6 px-4 flex justify-center">
+          <div className="bill-printable bg-white shadow-xl"
+            style={{
+              width: '210mm',
+              minHeight: '297mm',
+              paddingTop: '2in',
+              paddingLeft: '14mm',
+              paddingRight: '14mm',
+              paddingBottom: '14mm',
+              boxSizing: 'border-box',
+              fontFamily: 'Arial, sans-serif',
+              fontSize: '13px',
+              color: '#000',
+              lineHeight: '1.6',
+            }}>
 
             {/* Bill No + Date */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
               <span><strong>Bill No.:-</strong>&nbsp;&nbsp;{billNo}</span>
-              <span><strong>Date:-</strong>&nbsp;&nbsp;{today}</span>
+              <span><strong>Date:-</strong>&nbsp;&nbsp;{billDate}</span>
             </div>
 
             {/* Title */}
-            <h2 style={{ textAlign: 'center', fontWeight: 'bold', textDecoration: 'underline', fontSize: '17px', marginBottom: '18px' }}>
+            <h2 style={{ textAlign: 'center', fontWeight: 'bold', textDecoration: 'underline', fontSize: '16px', marginBottom: '16px' }}>
               (Physiotherapy Division)
             </h2>
 
-            {/* Patient info block */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '22px' }}>
+            {/* Patient info */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
               <tbody>
                 {([
-                  ['Name',         patient.name],
-                  ['Age/Sex',      `${patient.age} Yrs / ${patient.gender}`],
-                  ['Ref. by',      patient.referred_by || 'Self'],
+                  ['Name',         name],
+                  ['Age/Sex',      `${age} Yrs / ${gender}`],
+                  ['Ref. by',      refBy || 'Self'],
                   ['Diagnosis',    diagnosis || '—'],
                   ['Joining Date', joiningDate],
                 ] as [string, string][]).map(([label, value]) => (
                   <tr key={label}>
-                    <td style={{ width: '120px', fontWeight: 'bold', paddingBottom: '3px' }}>{label}</td>
+                    <td style={{ width: '110px', fontWeight: 'bold', paddingBottom: '3px' }}>{label}</td>
                     <td style={{ width: '14px', paddingBottom: '3px' }}>:-</td>
                     <td style={{ paddingBottom: '3px' }}>{value}</td>
                   </tr>
@@ -250,35 +338,31 @@ function BillPreview({ patient, billNo, diagnosis, rows, total, onClose }: {
             </table>
 
             {/* Charges table */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '18px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px' }}>
               <thead>
                 <tr>
-                  <th style={{ ...cellLeft, width: '38%', borderBottom: '2px solid #333' }}></th>
-                  <th style={{ ...cellStyle, borderBottom: '2px solid #333' }}>1) Charge /<br />Day</th>
-                  <th style={{ ...cellStyle, borderBottom: '2px solid #333' }}>2) No. of<br />Days</th>
-                  <th style={{ ...cellStyle, borderBottom: '2px solid #333' }}>3) Visits /<br />day</th>
-                  <th style={{ ...cellStyle, fontWeight: 'bold', borderBottom: '2px solid #333' }}>Amount<br />Total</th>
+                  <th style={{ ...cellL, width: '40%', borderBottom: '2px solid #333', fontWeight: 'normal' }}></th>
+                  <th style={{ ...cell, borderBottom: '2px solid #333' }}>1) Charge /<br />Day</th>
+                  <th style={{ ...cell, borderBottom: '2px solid #333' }}>2) No. of<br />Days</th>
+                  <th style={{ ...cell, borderBottom: '2px solid #333' }}>3) Visits /<br />day</th>
+                  <th style={{ ...cell, fontWeight: 'bold', borderBottom: '2px solid #333' }}>Amount<br />Total</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, i) => {
-                  const amt = rowAmt(row)
-                  return (
-                    <tr key={i}>
-                      <td style={cellLeft}>{row.label}</td>
-                      <td style={cellStyle}>{row.chargePerDay || 0}</td>
-                      <td style={cellStyle}>{row.days || 0}</td>
-                      <td style={cellStyle}>{row.visitsPerDay || 0}</td>
-                      <td style={{ ...cellStyle, textAlign: 'right' }}>{amt || 0}</td>
-                    </tr>
-                  )
-                })}
-                {/* spacer row */}
+                {rows.map((row, i) => (
+                  <tr key={i}>
+                    <td style={cellL}>{row.label}</td>
+                    <td style={cell}>{row.chargePerDay || 0}</td>
+                    <td style={cell}>{row.days || 0}</td>
+                    <td style={cell}>{row.visitsPerDay || 0}</td>
+                    <td style={{ ...cell, textAlign: 'right' }}>{rowAmt(row) || 0}</td>
+                  </tr>
+                ))}
                 <tr>
-                  <td colSpan={4} style={{ ...cellStyle, textAlign: 'right', fontWeight: 'bold', borderTop: '2px solid #333', paddingTop: '8px' }}>
+                  <td colSpan={4} style={{ ...cell, textAlign: 'right', fontWeight: 'bold', borderTop: '2px solid #333' }}>
                     Total
                   </td>
-                  <td style={{ ...cellStyle, textAlign: 'right', fontWeight: 'bold', borderTop: '2px solid #333' }}>
+                  <td style={{ ...cell, textAlign: 'right', fontWeight: 'bold', borderTop: '2px solid #333' }}>
                     {total}
                   </td>
                 </tr>
@@ -286,7 +370,7 @@ function BillPreview({ patient, billNo, diagnosis, rows, total, onClose }: {
             </table>
 
             {/* Amount in words */}
-            <p style={{ marginBottom: '48px' }}>
+            <p style={{ marginBottom: '44px' }}>
               <strong>Amount In Words:-</strong>&nbsp;&nbsp;{toWords(total)}
             </p>
 
