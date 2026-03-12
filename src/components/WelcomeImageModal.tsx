@@ -10,6 +10,8 @@ export default function WelcomeImageModal({ patient, onClose, capturedPhoto }: P
   const cardRef = useRef<HTMLDivElement>(null)
   const [photoBase64, setPhotoBase64] = useState<string | null>(null)
   const [photoLoading, setPhotoLoading] = useState(false)
+  // true when all load attempts failed — skips direct-URL <img> so html2canvas doesn't blank
+  const [photoFailed, setPhotoFailed] = useState(false)
 
   // Use capturedPhoto directly if supplied (avoids re-fetch on new registration).
   // Otherwise download via Supabase SDK so html2canvas can embed it (avoids CORS blank).
@@ -23,41 +25,53 @@ export default function WelcomeImageModal({ patient, onClose, capturedPhoto }: P
     // Case 2: no photo at all
     if (!patient.photo_url) return
 
-    // Case 3: existing patient — download via Supabase Storage SDK (bypasses CORS)
+    // Case 3: existing patient — download via Supabase Storage (bypasses CORS)
     setPhotoLoading(true)
+    setPhotoFailed(false)
 
-    // Extract just the filename from the full public URL (strip query params too)
-    const segments = patient.photo_url.split('/')
-    const fileName = segments[segments.length - 1].split('?')[0]
+    // Extract the FULL path within the bucket from the public URL.
+    // Supabase URLs: https://<ref>.supabase.co/storage/v1/object/public/patient-photos/<path>
+    const BUCKET = 'patient-photos'
+    const publicMarker = `/object/public/${BUCKET}/`
+    const storagePath = patient.photo_url.includes(publicMarker)
+      ? patient.photo_url.split(publicMarker)[1].split('?')[0]
+      : patient.photo_url.split('/').pop()!.split('?')[0]
 
-    supabase.storage.from('patient-photos').download(fileName)
-      .then(({ data, error }) => {
-        if (data && !error) {
-          // Supabase SDK succeeded — convert Blob → base64 data URL
-          const reader = new FileReader()
-          reader.onloadend = () => {
-            setPhotoBase64(reader.result as string)
-            setPhotoLoading(false)
-          }
-          reader.onerror = () => setPhotoLoading(false)
-          reader.readAsDataURL(data)
-        } else {
-          // SDK failed — fall back to plain fetch with no-cors workaround
-          return fetch(patient.photo_url!, { mode: 'cors', cache: 'no-cache' })
-            .then(r => r.blob())
-            .then(blob => {
-              const reader = new FileReader()
-              reader.onloadend = () => {
-                setPhotoBase64(reader.result as string)
-                setPhotoLoading(false)
-              }
-              reader.onerror = () => setPhotoLoading(false)
-              reader.readAsDataURL(blob)
-            })
-            .catch(() => setPhotoLoading(false))
-        }
+    const blobToBase64 = (blob: Blob): Promise<string> =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
       })
-      .catch(() => setPhotoLoading(false))
+
+    ;(async () => {
+      // Attempt 1: Supabase SDK download — authenticated, zero CORS issues
+      const { data: blob1, error: err1 } = await supabase.storage
+        .from(BUCKET).download(storagePath)
+      if (blob1 && !err1) {
+        setPhotoBase64(await blobToBase64(blob1))
+        setPhotoLoading(false)
+        return
+      }
+
+      // Attempt 2: Signed URL fetch — short-lived URL, also bypasses CORS
+      const { data: signed } = await supabase.storage
+        .from(BUCKET).createSignedUrl(storagePath, 120)
+      if (signed?.signedUrl) {
+        try {
+          const r = await fetch(signed.signedUrl)
+          const blob2 = await r.blob()
+          setPhotoBase64(await blobToBase64(blob2))
+          setPhotoLoading(false)
+          return
+        } catch { /* fall through */ }
+      }
+
+      // Both attempts failed — show initials placeholder (html2canvas-safe)
+      setPhotoFailed(true)
+      setPhotoLoading(false)
+    })()
   }, [patient.photo_url, capturedPhoto])
 
   async function downloadImage() {
@@ -180,18 +194,21 @@ export default function WelcomeImageModal({ patient, onClose, capturedPhoto }: P
                       animation: 'spin 0.8s linear infinite' }} />
                   </div>
                 ) : photoBase64 ? (
-                  /* Best case: base64 embedded — html2canvas renders perfectly */
+                  /* Base64 embedded — html2canvas renders perfectly, always works */
                   <img src={photoBase64} alt={patient.name}
                     style={{ width: 76, height: 90, objectFit: 'cover', borderRadius: 8,
                       border: '2.5px solid #F6A000',
                       boxShadow: '0 2px 8px rgba(246,160,0,0.3)' }} />
-                ) : patient.photo_url ? (
-                  /* Fallback: direct URL — always visible, fine for display */
+                ) : patient.photo_url && !photoFailed ? (
+                  /* Still loading / pre-base64: show direct URL for preview only.
+                     NOTE: this branch is only reached briefly before base64 is ready.
+                     Buttons are disabled (photoLoading) so html2canvas won't run here. */
                   <img src={patient.photo_url} alt={patient.name} crossOrigin="anonymous"
                     style={{ width: 76, height: 90, objectFit: 'cover', borderRadius: 8,
                       border: '2.5px solid #F6A000',
                       boxShadow: '0 2px 8px rgba(246,160,0,0.3)' }} />
                 ) : (
+                  /* No photo or all load attempts failed — initials block (html2canvas-safe) */
                   <div style={{ width: 76, height: 90, borderRadius: 8,
                     background: 'linear-gradient(135deg, #F6A000, #e08800)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
