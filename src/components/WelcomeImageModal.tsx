@@ -63,7 +63,7 @@ export default function WelcomeImageModal({ patient, onClose, capturedPhoto }: P
   async function downloadImage() {
     if (!cardRef.current) return
     const canvas = await html2canvas(cardRef.current, {
-      scale: 2,
+      scale: 6,
       useCORS: true,
       backgroundColor: null,
       imageTimeout: 15000,
@@ -78,7 +78,7 @@ export default function WelcomeImageModal({ patient, onClose, capturedPhoto }: P
   async function shareImage() {
     if (!cardRef.current) return
     const canvas = await html2canvas(cardRef.current, {
-      scale: 2,
+      scale: 6,
       useCORS: true,
       backgroundColor: null,
       imageTimeout: 15000,
@@ -220,7 +220,7 @@ export default function WelcomeImageModal({ patient, onClose, capturedPhoto }: P
                     {patient.name}
                   </p>
                   {patient.name_gujarati && (
-                    <p style={{ color: '#9ca3af', fontSize: 11, margin: 0, fontFamily: gujFont }}>
+                    <p style={{ color: '#374151', fontSize: 11, margin: 0, fontFamily: gujFont }}>
                       {patient.name_gujarati}
                     </p>
                   )}
