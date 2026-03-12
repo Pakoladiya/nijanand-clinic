@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Sun, Moon, Plus, Trash2, History, IndianRupe
 import type { Attendance, Patient, Session, Package } from '../types'
 
 interface AttendanceWithPatient extends Attendance {
-  patients: { name: string; registration_number: string } | null
+  patients: { name: string; registration_number: string; previous_sessions: number | null } | null
 }
 
 interface Props {
@@ -33,7 +33,7 @@ export default function AttendancePage({ navigateTo }: Props) {
   const loadAttendance = useCallback(async () => {
     const { data } = await supabase
       .from('attendance')
-      .select('*, patients(name, registration_number)')
+      .select('*, patients(name, registration_number, previous_sessions)')
       .eq('date', selectedDate)
       .eq('session', selectedSession)
       .order('created_at', { ascending: true })
@@ -143,12 +143,14 @@ export default function AttendancePage({ navigateTo }: Props) {
         .gte('date', latestPkg.start_date)
       visitNumber = (pkgCount || 0) + 1
     } else {
-      // No package yet — count all DB records + manually entered previous sessions
+      // No package yet — purely sequential count of app-recorded sessions.
+      // previous_sessions is NOT stored here; it is added at display time so
+      // the shown total always equals (app visits + previous_sessions).
       const { count: totalCount } = await supabase
         .from('attendance')
         .select('*', { count: 'exact', head: true })
         .eq('patient_id', patient.id)
-      visitNumber = (totalCount || 0) + 1 + (patient.previous_sessions || 0)
+      visitNumber = (totalCount || 0) + 1
     }
     // ───────────────────────────────────────────────────────────────────
 
@@ -468,7 +470,10 @@ export default function AttendancePage({ navigateTo }: Props) {
                     {' • '}
                     {(() => {
                       const pi = pkgInfo[r.patient_id]
-                      if (!pi) return `Visit #${r.visit_number}`
+                      // previous_sessions (before-app visits) are added to the raw
+                      // sequential visit_number so the total matches the patient profile
+                      const prevSessions = r.patients?.previous_sessions || 0
+                      if (!pi) return `Visit #${r.visit_number + prevSessions}`
                       const prefix = pi.prevCount > 0 ? `${pi.prevCount}+` : ''
                       return (
                         <span className="font-semibold" style={{ color: '#39A900' }}>

@@ -185,7 +185,9 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
   // Returns "X/Y" for first package, "N+X/Y" for subsequent packages,
   // or "Visit #N" when no package covers this attendance record.
   function visitLabel(att: Attendance): string {
-    if (packages.length === 0) return `Visit #${att.visit_number}`
+    // For non-package visits, display = sequential visit_number + previous_sessions
+    // so the label matches the "Total Visits" stat on the profile header.
+    if (packages.length === 0) return `Visit #${att.visit_number + prevSessions}`
 
     // Sort packages oldest-first
     const sorted = [...packages].sort((a, b) => a.start_date.localeCompare(b.start_date))
@@ -195,7 +197,7 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
     for (let i = sorted.length - 1; i >= 0; i--) {
       if (att.date >= sorted[i].start_date) { pkgIdx = i; break }
     }
-    if (pkgIdx === -1) return `Visit #${att.visit_number}` // before any package
+    if (pkgIdx === -1) return `Visit #${att.visit_number + prevSessions}` // before any package
 
     const pkg = sorted[pkgIdx]
 
