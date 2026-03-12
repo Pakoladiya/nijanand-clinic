@@ -92,12 +92,22 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
 
   async function createPackage() {
     if (!staff || !pkgForm.total_amount || !pkgForm.sessions) return
+
+    // If no packages exist yet but the patient has prior attendance (unpaid sessions),
+    // backdate the package start to their very first session so those sessions
+    // count inside the package (e.g. 3 prior sessions → day 4 is 4/10, not 1/10).
+    let startDate = format(new Date(), 'yyyy-MM-dd')
+    if (packages.length === 0 && attendance.length > 0) {
+      const earliest = [...attendance].sort((a, b) => a.date.localeCompare(b.date))[0]
+      startDate = earliest.date
+    }
+
     await supabase.from('packages').insert({
       patient_id: patient.id,
       total_sessions: parseInt(pkgForm.sessions),
       total_amount: parseFloat(pkgForm.total_amount),
       amount_paid: 0,
-      start_date: format(new Date(), 'yyyy-MM-dd'),
+      start_date: startDate,
       created_by: staff.id,
     })
     await logActivity(staff.id, 'PACKAGE_CREATED',
@@ -170,6 +180,41 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
 
   const maskPhone = (phone: string) =>
     staff?.role === 'admin' ? phone : phone.slice(0, 5) + ' *****'
+
+  // ── Package-aware visit label ─────────────────────────────────────────────
+  // Returns "X/Y" for first package, "N+X/Y" for subsequent packages,
+  // or "Visit #N" when no package covers this attendance record.
+  function visitLabel(att: Attendance): string {
+    if (packages.length === 0) return `Visit #${att.visit_number}`
+
+    // Sort packages oldest-first
+    const sorted = [...packages].sort((a, b) => a.start_date.localeCompare(b.start_date))
+
+    // Find the latest package whose start_date ≤ att.date
+    let pkgIdx = -1
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (att.date >= sorted[i].start_date) { pkgIdx = i; break }
+    }
+    if (pkgIdx === -1) return `Visit #${att.visit_number}` // before any package
+
+    const pkg = sorted[pkgIdx]
+
+    // Sessions before this package's start (from all previous packages)
+    const prevCount = attendance.filter(a => a.date < pkg.start_date).length
+
+    // Sorted position within this package
+    const pkgSessions = attendance
+      .filter(a => a.date >= pkg.start_date)
+      .sort((a, b) => {
+        const d = a.date.localeCompare(b.date)
+        return d !== 0 ? d : a.created_at.localeCompare(b.created_at)
+      })
+    const posInPkg = pkgSessions.findIndex(a => a.id === att.id) + 1
+
+    const prefix = prevCount > 0 ? `${prevCount}+` : ''
+    return `${prefix}${posInPkg}/${pkg.total_sessions}`
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <div className="max-w-lg mx-auto pb-8">
@@ -440,30 +485,34 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
               <p className="text-center text-sm text-gray-400 py-8">
                 {prevSessions > 0 ? 'No sessions recorded via app yet' : 'No visits recorded yet'}
               </p>
-            ) : attendance.map((a) => (
-              <div key={a.id} className="flex items-center gap-3 px-4 py-3 border-b last:border-0 border-gray-50">
-                <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                  style={{
-                    backgroundColor: a.visit_number === 1 ? '#f0fce8' : '#f3f4f6',
-                    color: a.visit_number === 1 ? '#39A900' : '#374151',
-                  }}>
-                  {a.visit_number}
-                </span>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-700">
-                    {format(parseISO(a.date), 'dd MMM yyyy')}
-                  </p>
-                  <p className="text-xs text-gray-400 capitalize">
-                    {a.session} session
-                    {a.is_retroactive && <span className="ml-1 text-amber-500">• Added late</span>}
-                  </p>
+            ) : attendance.map((a) => {
+              const label = visitLabel(a)
+              const isPackageLabel = label.includes('/')
+              return (
+                <div key={a.id} className="flex items-center gap-3 px-4 py-3 border-b last:border-0 border-gray-50">
+                  <span className="flex-shrink-0 text-xs font-bold px-2 py-1 rounded-lg min-w-[2.5rem] text-center"
+                    style={{
+                      backgroundColor: isPackageLabel ? '#f0fce8' : '#f3f4f6',
+                      color: isPackageLabel ? '#39A900' : '#374151',
+                    }}>
+                    {label}
+                  </span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-700">
+                      {format(parseISO(a.date), 'dd MMM yyyy')}
+                    </p>
+                    <p className="text-xs text-gray-400 capitalize">
+                      {a.session} session
+                      {a.is_retroactive && <span className="ml-1 text-amber-500">• Added late</span>}
+                    </p>
+                  </div>
+                  <span className="text-xs px-2 py-1 rounded-full"
+                    style={{ backgroundColor: a.session === 'morning' ? '#FEF3C7' : '#EFF6FF', color: a.session === 'morning' ? '#92400e' : '#1e40af' }}>
+                    {a.session === 'morning' ? '☀️' : '🌙'}
+                  </span>
                 </div>
-                <span className="text-xs px-2 py-1 rounded-full"
-                  style={{ backgroundColor: a.session === 'morning' ? '#FEF3C7' : '#EFF6FF', color: a.session === 'morning' ? '#92400e' : '#1e40af' }}>
-                  {a.session === 'morning' ? '☀️' : '🌙'}
-                </span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

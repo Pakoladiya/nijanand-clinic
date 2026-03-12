@@ -3,7 +3,7 @@ import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format, addDays, parseISO, isToday } from 'date-fns'
 import { ChevronLeft, ChevronRight, Sun, Moon, Plus, Trash2, History, IndianRupee, X } from 'lucide-react'
-import type { Attendance, Patient, Session } from '../types'
+import type { Attendance, Patient, Session, Package } from '../types'
 
 interface AttendanceWithPatient extends Attendance {
   patients: { name: string; registration_number: string } | null
@@ -22,6 +22,8 @@ export default function AttendancePage({ navigateTo }: Props) {
   const [searchResults, setSearchResults] = useState<Patient[]>([])
   const [loading, setLoading] = useState(false)
   const [attendedDates, setAttendedDates] = useState<Set<string>>(new Set())
+  // Package context per patient for visit label display
+  const [pkgInfo, setPkgInfo] = useState<Record<string, { pkg: Package; prevCount: number } | null>>({})
 
   // ── Payment prompt (today only) ──
   const [pendingPayPatient, setPendingPayPatient] = useState<Patient | null>(null)
@@ -35,8 +37,48 @@ export default function AttendancePage({ navigateTo }: Props) {
       .eq('date', selectedDate)
       .eq('session', selectedSession)
       .order('created_at', { ascending: true })
-    setRecords((data as AttendanceWithPatient[]) || [])
+    const recs = (data as AttendanceWithPatient[]) || []
+    setRecords(recs)
+    loadPkgInfo(recs)
   }, [selectedDate, selectedSession])
+
+  // Batch-load package context for the session's patients
+  async function loadPkgInfo(recs: AttendanceWithPatient[]) {
+    if (recs.length === 0) { setPkgInfo({}); return }
+    const pids = [...new Set(recs.map(r => r.patient_id))]
+
+    // 1. Fetch all packages for these patients
+    const { data: pkgs } = await supabase
+      .from('packages').select('*')
+      .in('patient_id', pids)
+      .order('start_date', { ascending: true })
+
+    // 2. Fetch all attendance dates for these patients (for pre-package count)
+    const { data: allAtt } = await supabase
+      .from('attendance').select('patient_id, date')
+      .in('patient_id', pids)
+
+    const result: Record<string, { pkg: Package; prevCount: number } | null> = {}
+    pids.forEach(pid => {
+      const patPkgs = ((pkgs || []) as Package[])
+        .filter(p => p.patient_id === pid)
+        .sort((a, b) => a.start_date.localeCompare(b.start_date))
+
+      // Find latest package covering selectedDate
+      let latestPkg: Package | null = null
+      for (let i = patPkgs.length - 1; i >= 0; i--) {
+        if (selectedDate >= patPkgs[i].start_date) { latestPkg = patPkgs[i]; break }
+      }
+
+      if (!latestPkg) { result[pid] = null; return }
+
+      const prevCount = (allAtt || [])
+        .filter(a => a.patient_id === pid && a.date < latestPkg!.start_date).length
+
+      result[pid] = { pkg: latestPkg, prevCount }
+    })
+    setPkgInfo(result)
+  }
 
   // Load attendance dots for ±14 days around the selected date
   const loadNearbyAttendance = useCallback(async () => {
@@ -415,15 +457,25 @@ export default function AttendancePage({ navigateTo }: Props) {
                 <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
                   style={{ backgroundColor: '#F6A000' }}>{i + 1}</span>
                 <div className="flex-1 min-w-0">
-                  {/* Tapping the name goes to the patient's profile page */}
                   <button
                     onClick={() => navigateTo?.('patients', r.patient_id)}
-                    className="text-sm font-semibold text-gray-800 truncate text-left w-full hover:underline"
+                    className="text-sm font-semibold truncate text-left w-full hover:underline"
                     style={{ color: '#1a56db' }}>
                     {r.patients?.name || 'Unknown'}
                   </button>
                   <p className="text-xs text-gray-400">
-                    {r.patients?.registration_number} • Visit #{r.visit_number}
+                    {r.patients?.registration_number}
+                    {' • '}
+                    {(() => {
+                      const pi = pkgInfo[r.patient_id]
+                      if (!pi) return `Visit #${r.visit_number}`
+                      const prefix = pi.prevCount > 0 ? `${pi.prevCount}+` : ''
+                      return (
+                        <span className="font-semibold" style={{ color: '#39A900' }}>
+                          {prefix}{r.visit_number}/{pi.pkg.total_sessions}
+                        </span>
+                      )
+                    })()}
                     {r.is_retroactive && <span className="ml-1 text-amber-500">• Added late</span>}
                   </p>
                 </div>
