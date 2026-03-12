@@ -265,7 +265,7 @@ export default function WelcomeImageModal({ patient, onClose, capturedPhoto }: P
                     નોંધણી નંબર / Registration No.
                   </p>
                   <p style={{ color: '#F6A000', fontWeight: 'bold', fontSize: 17, margin: 0,
-                    letterSpacing: '1.5px', fontFamily: "'Arial', sans-serif", lineHeight: 1,
+                    letterSpacing: '1.5px', fontFamily: "'Arial', sans-serif", lineHeight: 1.4,
                     whiteSpace: 'nowrap' }}>
                     {patient.registration_number}
                   </p>
