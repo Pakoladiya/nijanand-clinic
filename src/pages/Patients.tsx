@@ -18,6 +18,8 @@ export default function PatientsPage({ patientIdToOpen, onPatientOpened }: Props
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Patient | null>(null)
+  // attendance count (from DB) per patient — previous_sessions is added at display time
+  const [attCounts, setAttCounts] = useState<Record<string, number>>({})
 
   // Auto-open a specific patient (e.g. navigated from Attendance list)
   useEffect(() => {
@@ -36,6 +38,7 @@ export default function PatientsPage({ patientIdToOpen, onPatientOpened }: Props
   async function loadPatients() {
     setLoading(true)
     const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd')
+    let list: Patient[] = []
 
     if (search.length >= 2) {
       // Search: fetch matches + yesterday's attendees, sort yesterday-attendees first
@@ -51,13 +54,26 @@ export default function PatientsPage({ patientIdToOpen, onPatientOpened }: Props
         const bP = yestIds.has(b.id) ? 0 : 1
         return aP - bP
       })
-      setPatients(sorted.slice(0, 50))
+      list = sorted.slice(0, 50) as Patient[]
     } else {
       // No search: most recently registered first
       const { data } = await supabase.from('patients').select('*')
         .order('created_at', { ascending: false }).limit(50)
-      setPatients(data || [])
+      list = (data || []) as Patient[]
     }
+
+    setPatients(list)
+
+    // Batch-fetch attendance counts for displayed patients
+    if (list.length > 0) {
+      const ids = list.map(p => p.id)
+      const { data: attRows } = await supabase
+        .from('attendance').select('patient_id').in('patient_id', ids)
+      const map: Record<string, number> = {}
+      attRows?.forEach((r: any) => { map[r.patient_id] = (map[r.patient_id] || 0) + 1 })
+      setAttCounts(map)
+    }
+
     setLoading(false)
   }
 
@@ -92,33 +108,42 @@ export default function PatientsPage({ patientIdToOpen, onPatientOpened }: Props
         <div className="text-center py-8 text-gray-400 text-sm">No patients found</div>
       ) : (
         <div className="space-y-2">
-          {patients.map(p => (
-            <button key={p.id} onClick={() => setSelected(p)}
-              className="w-full bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3 text-left hover:border-orange-200 transition-colors">
-              {p.photo_url ? (
-                <img src={p.photo_url} alt={p.name}
-                  className="w-12 h-12 rounded-full object-cover flex-shrink-0 border-2 border-gray-100" />
-              ) : (
-                <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold text-lg"
-                  style={{ backgroundColor: '#F6A000' }}>
-                  {p.name[0].toUpperCase()}
+          {patients.map(p => {
+            const totalVisits = (attCounts[p.id] || 0) + (p.previous_sessions || 0)
+            return (
+              <button key={p.id} onClick={() => setSelected(p)}
+                className="w-full bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3 text-left hover:border-orange-200 transition-colors">
+                {p.photo_url ? (
+                  <img src={p.photo_url} alt={p.name}
+                    className="w-12 h-12 rounded-full object-cover flex-shrink-0 border-2 border-gray-100" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold text-lg"
+                    style={{ backgroundColor: '#F6A000' }}>
+                    {p.name[0].toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-800 truncate">{p.name}</p>
+                  <p className="text-xs text-gray-400">{p.registration_number} • {p.age}y, {p.gender}</p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-xs text-gray-400 flex items-center gap-1">
+                      <Phone size={10} /> {maskPhone(p.phone)}
+                    </span>
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#FEF3C7', color: '#92400e' }}>
+                      {p.chief_complaint}
+                    </span>
+                    {totalVisits > 0 && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                        style={{ backgroundColor: '#f0fce8', color: '#39A900' }}>
+                        {totalVisits} visits
+                      </span>
+                    )}
+                  </div>
                 </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-800 truncate">{p.name}</p>
-                <p className="text-xs text-gray-400">{p.registration_number} • {p.age}y, {p.gender}</p>
-                <div className="flex items-center gap-3 mt-1">
-                  <span className="text-xs text-gray-400 flex items-center gap-1">
-                    <Phone size={10} /> {maskPhone(p.phone)}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#FEF3C7', color: '#92400e' }}>
-                    {p.chief_complaint}
-                  </span>
-                </div>
-              </div>
-              <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
-            </button>
-          ))}
+                <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
+              </button>
+            )
+          })}
         </div>
       )}
     </div>

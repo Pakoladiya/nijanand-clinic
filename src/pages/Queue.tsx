@@ -25,6 +25,8 @@ export default function QueuePage({ navigateTo }: { navigateTo?: (page: string, 
   const [markingId, setMarkingId] = useState<string | null>(null)
   const [showDone, setShowDone] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(new Date())
+  // total attendance DB count per patient (previous_sessions added at display time)
+  const [attCounts, setAttCounts] = useState<Record<string, number>>({})
 
   // ── Payment collection state ──
   const [payPrompt, setPayPrompt] = useState<PaymentPrompt | null>(null)
@@ -49,7 +51,7 @@ export default function QueuePage({ navigateTo }: { navigateTo?: (page: string, 
   async function loadQueue() {
     const { data } = await supabase
       .from('waiting_list')
-      .select('*, patients(name, registration_number, fees_amount, fees_type)')
+      .select('*, patients(name, registration_number, fees_amount, fees_type, previous_sessions)')
       .eq('date', today)
       .eq('session', session)
       .order('added_at')
@@ -60,11 +62,22 @@ export default function QueuePage({ navigateTo }: { navigateTo?: (page: string, 
       registration_number: row.patients?.registration_number,
       fees_amount: row.patients?.fees_amount ?? 0,
       fees_type: row.patients?.fees_type ?? 'per_session',
+      previous_sessions: row.patients?.previous_sessions ?? 0,
     }))
 
     setWaiting(rows.filter((r: any) => r.status === 'waiting'))
     setDone(rows.filter((r: any) => r.status === 'done'))
     setLastUpdated(new Date())
+
+    // Batch-fetch attendance counts for all queue patients
+    const ids = [...new Set(rows.map((r: any) => r.patient_id as string))]
+    if (ids.length > 0) {
+      const { data: attRows } = await supabase
+        .from('attendance').select('patient_id').in('patient_id', ids)
+      const map: Record<string, number> = {}
+      attRows?.forEach((r: any) => { map[r.patient_id] = (map[r.patient_id] || 0) + 1 })
+      setAttCounts(map)
+    }
   }
 
   // ── Open payment prompt ──
@@ -245,7 +258,18 @@ export default function QueuePage({ navigateTo }: { navigateTo?: (page: string, 
                       style={{ color: '#F6A000' }}>
                       {entry.patient_name}
                     </button>
-                    <p className="text-xs text-gray-500 mt-0.5">{entry.registration_number}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs text-gray-500">{entry.registration_number}</p>
+                      {(() => {
+                        const total = (attCounts[entry.patient_id] || 0) + ((entry as any).previous_sessions || 0)
+                        return total > 0 ? (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold"
+                            style={{ backgroundColor: '#f0fce8', color: '#39A900' }}>
+                            {total} visits
+                          </span>
+                        ) : null
+                      })()}
+                    </div>
                     <div className="flex items-center gap-2 mt-2">
                       <span className="text-xs text-gray-500 flex items-center gap-1">
                         <Clock size={10} /> Arrived {formatTime(entry.added_at)}
