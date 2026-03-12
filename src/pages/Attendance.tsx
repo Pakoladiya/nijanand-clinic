@@ -124,6 +124,37 @@ export default function AttendancePage({ navigateTo }: Props) {
     })
 
     if (!error) {
+      // Sync to waiting_list so Queue page shows this patient as attended
+      if (!isRetroactive) {
+        const { data: existingWL } = await supabase
+          .from('waiting_list')
+          .select('id, status')
+          .eq('patient_id', patient.id)
+          .eq('date', selectedDate)
+          .eq('session', selectedSession)
+          .maybeSingle()
+
+        if (existingWL) {
+          // Already in queue (e.g. added by reception) — mark as done
+          if (existingWL.status === 'waiting') {
+            await supabase.from('waiting_list')
+              .update({ status: 'done' })
+              .eq('id', existingWL.id)
+          }
+        } else {
+          // Not in queue at all — insert as done so Queue shows 1 attended
+          await supabase.from('waiting_list').insert({
+            patient_id: patient.id,
+            date: selectedDate,
+            session: selectedSession,
+            status: 'done',
+            added_by: staff.id,
+            added_at: new Date().toISOString(),
+            notes: '',
+          })
+        }
+      }
+
       // Record payment for today's entries only
       if (!isRetroactive && payAmt > 0) {
         await supabase.from('payments').insert({
