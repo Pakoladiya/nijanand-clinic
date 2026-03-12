@@ -263,20 +263,26 @@ function BillPreview({ billNo, billDate, name, age, gender, refBy, joiningDate, 
         @media print {
           @page { size: A4 portrait; margin: 0; }
           body * { visibility: hidden !important; }
-          .bill-printable, .bill-printable * { visibility: visible !important; }
-          .bill-printable {
-            position: fixed !important;
-            top: 0; left: 0;
-            width: 210mm;
-            min-height: 297mm;
-            padding: 2in 14mm 14mm 14mm;
-            background: white;
-            box-sizing: border-box;
+          #bill-overlay {
+            visibility: visible !important;
+            position: static !important;
+            background: white !important;
+            display: block !important;
+            overflow: visible !important;
           }
+          #bill-scroll {
+            visibility: visible !important;
+            overflow: visible !important;
+            padding: 0 !important;
+            display: block !important;
+          }
+          .bill-no-print { display: none !important; visibility: hidden !important; }
+          .bill-printable { visibility: visible !important; box-shadow: none !important; }
+          .bill-printable * { visibility: visible !important; }
         }
       `}</style>
 
-      <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#d1d5db' }}>
+      <div id="bill-overlay" className="fixed inset-0 z-50 flex flex-col" style={{ background: '#d1d5db' }}>
         {/* Action bar */}
         <div className="bill-no-print flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 shadow-sm">
           <button onClick={onClose} className="flex items-center gap-1.5 text-sm text-gray-600">
@@ -291,7 +297,7 @@ function BillPreview({ billNo, billDate, name, age, gender, refBy, joiningDate, 
         </div>
 
         {/* Scrollable A4 preview */}
-        <div className="flex-1 overflow-y-auto py-6 px-4 flex justify-center">
+        <div id="bill-scroll" className="flex-1 overflow-y-auto py-6 px-4 flex justify-center">
           <div className="bill-printable bg-white shadow-xl"
             style={{
               width: '210mm',
