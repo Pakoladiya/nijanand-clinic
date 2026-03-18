@@ -147,6 +147,7 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
     physio_exercises: '',
   })
   const [treatmentLoading, setTreatmentLoading] = useState(false)
+  const [treatmentError, setTreatmentError] = useState('')
   // ─────────────────────────────────────────────────────────────────────────
 
   // ── Edit patient state ────────────────────────────────────────────────────
@@ -242,6 +243,7 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
   async function saveTreatmentPlan() {
     if (!staff) return
     setTreatmentLoading(true)
+    setTreatmentError('')
     const payload = {
       patient_id: patient.id,
       therapy_type: treatmentForm.therapy_type,
@@ -251,15 +253,19 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
       updated_by: staff.id,
       updated_at: new Date().toISOString(),
     }
+    let error
     if (treatment) {
-      await supabase.from('treatment_plans').update(payload).eq('id', treatment.id)
-      await logActivity(staff.id, 'TREATMENT_UPDATED',
-        `Updated treatment plan for ${localPatient.name} (${localPatient.registration_number})`)
+      ;({ error } = await supabase.from('treatment_plans').update(payload).eq('id', treatment.id))
     } else {
-      await supabase.from('treatment_plans').insert({ ...payload, created_by: staff.id })
-      await logActivity(staff.id, 'TREATMENT_CREATED',
-        `Created treatment plan for ${localPatient.name} (${localPatient.registration_number})`)
+      ;({ error } = await supabase.from('treatment_plans').insert({ ...payload, created_by: staff.id }))
     }
+    if (error) {
+      setTreatmentError(`Save failed: ${error.message}`)
+      setTreatmentLoading(false)
+      return
+    }
+    await logActivity(staff.id, treatment ? 'TREATMENT_UPDATED' : 'TREATMENT_CREATED',
+      `${treatment ? 'Updated' : 'Created'} treatment plan for ${localPatient.name} (${localPatient.registration_number})`)
     setTreatmentLoading(false)
     setShowTreatmentForm(false)
     loadData()
@@ -688,6 +694,12 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
                   <X size={18} />
                 </button>
               </div>
+
+              {treatmentError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                  {treatmentError}
+                </p>
+              )}
 
               {/* Therapy Type */}
               <div>
