@@ -4,10 +4,10 @@ import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
 import {
   ArrowLeft, Phone, MapPin, Calendar, CreditCard, Plus, Download,
-  Package as PackageIcon, Trash2, Image, Pencil, X, Check,
+  Package as PackageIcon, Trash2, Image, Pencil, X, Check, Stethoscope,
 } from 'lucide-react'
 import WelcomeImageModal from '../components/WelcomeImageModal'
-import type { Patient, Attendance, Payment, Package } from '../types'
+import type { Patient, Attendance, Payment, Package, TreatmentPlan } from '../types'
 
 const COMPLAINTS = [
   'Back Pain', 'Neck Pain', 'Knee Pain', 'Shoulder Pain', 'Hip Pain',
@@ -29,7 +29,7 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
   const [attendance, setAttendance] = useState<Attendance[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [packages, setPackages] = useState<Package[]>([])
-  const [tab, setTab] = useState<'visits' | 'fees'>('visits')
+  const [tab, setTab] = useState<'visits' | 'fees' | 'treatment'>('visits')
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [showPackageForm, setShowPackageForm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -37,6 +37,18 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
   const [showWelcomeCard, setShowWelcomeCard] = useState(false)
   const [pkgForm, setPkgForm] = useState({ sessions: '15', total_amount: '' })
   const [payForm, setPayForm] = useState({ amount: '', notes: '', date: format(new Date(), 'yyyy-MM-dd') })
+
+  // ── Treatment plan state ──────────────────────────────────────────────────
+  const [treatment, setTreatment] = useState<TreatmentPlan | null>(null)
+  const [showTreatmentForm, setShowTreatmentForm] = useState(false)
+  const [treatmentForm, setTreatmentForm] = useState({
+    therapy_type: '',
+    exercises: '',
+    precautions: '',
+    goal: '',
+  })
+  const [treatmentLoading, setTreatmentLoading] = useState(false)
+  // ─────────────────────────────────────────────────────────────────────────
 
   // ── Edit patient state ────────────────────────────────────────────────────
   const [showEdit, setShowEdit] = useState(false)
@@ -56,14 +68,24 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
   useEffect(() => { loadData() }, [patient.id])
 
   async function loadData() {
-    const [{ data: att }, { data: pay }, { data: pkg }] = await Promise.all([
+    const [{ data: att }, { data: pay }, { data: pkg }, { data: trt }] = await Promise.all([
       supabase.from('attendance').select('*').eq('patient_id', patient.id).order('date', { ascending: false }),
       supabase.from('payments').select('*').eq('patient_id', patient.id).order('date', { ascending: false }),
       supabase.from('packages').select('*').eq('patient_id', patient.id).order('created_at'),
+      supabase.from('treatment_plans').select('*').eq('patient_id', patient.id).maybeSingle(),
     ])
     setAttendance(att || [])
     setPayments(pay || [])
     setPackages(pkg || [])
+    setTreatment(trt || null)
+    if (trt) {
+      setTreatmentForm({
+        therapy_type: trt.therapy_type,
+        exercises: trt.exercises,
+        precautions: trt.precautions,
+        goal: trt.goal,
+      })
+    }
   }
 
   const totalPaid = payments.reduce((s, p) => s + p.amount, 0)
@@ -116,6 +138,34 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
     setPkgForm({ sessions: '15', total_amount: '' })
     loadData()
   }
+
+  // ── Save treatment plan (insert or update) ───────────────────────────────
+  async function saveTreatmentPlan() {
+    if (!staff) return
+    setTreatmentLoading(true)
+    const payload = {
+      patient_id: patient.id,
+      therapy_type: treatmentForm.therapy_type,
+      exercises: treatmentForm.exercises,
+      precautions: treatmentForm.precautions,
+      goal: treatmentForm.goal,
+      updated_by: staff.id,
+      updated_at: new Date().toISOString(),
+    }
+    if (treatment) {
+      await supabase.from('treatment_plans').update(payload).eq('id', treatment.id)
+      await logActivity(staff.id, 'TREATMENT_UPDATED',
+        `Updated treatment plan for ${localPatient.name} (${localPatient.registration_number})`)
+    } else {
+      await supabase.from('treatment_plans').insert({ ...payload, created_by: staff.id })
+      await logActivity(staff.id, 'TREATMENT_CREATED',
+        `Created treatment plan for ${localPatient.name} (${localPatient.registration_number})`)
+    }
+    setTreatmentLoading(false)
+    setShowTreatmentForm(false)
+    loadData()
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   // ── Save patient edits ────────────────────────────────────────────────────
   async function saveEdit() {
@@ -459,13 +509,17 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
 
       {/* Tabs */}
       <div className="flex gap-2 mb-4">
-        {(['visits', 'fees'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className="flex-1 py-2.5 rounded-xl text-sm font-medium border transition-colors"
-            style={tab === t
+        {([
+          { key: 'visits',    label: `Visits (${totalVisits})` },
+          { key: 'fees',      label: 'Fees & Payments' },
+          { key: 'treatment', label: 'Treatment' },
+        ] as const).map(({ key, label }) => (
+          <button key={key} onClick={() => setTab(key)}
+            className="flex-1 py-2.5 rounded-xl text-xs font-semibold border transition-colors"
+            style={tab === key
               ? { backgroundColor: '#F6A000', borderColor: '#F6A000', color: 'white' }
               : { backgroundColor: 'white', borderColor: '#e5e7eb', color: '#374151' }}>
-            {t === 'visits' ? `Visits (${totalVisits})` : 'Fees & Payments'}
+            {label}
           </button>
         ))}
       </div>
@@ -516,6 +570,161 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
               )
             })}
           </div>
+        </div>
+      )}
+
+      {/* Treatment Tab */}
+      {tab === 'treatment' && (
+        <div className="space-y-3">
+
+          {/* Form — shown when adding or editing */}
+          {showTreatmentForm ? (
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                  <Stethoscope size={15} style={{ color: '#F6A000' }} />
+                  {treatment ? 'Edit Treatment Plan' : 'Add Treatment Plan'}
+                </p>
+                <button onClick={() => setShowTreatmentForm(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Therapy Type */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Therapy Type
+                </label>
+                <select
+                  value={treatmentForm.therapy_type}
+                  onChange={e => setTreatmentForm(f => ({ ...f, therapy_type: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 bg-white">
+                  <option value="">— Select therapy type —</option>
+                  {['Physiotherapy', 'Exercise Therapy', 'Manual Therapy',
+                    'Electrotherapy', 'Heat Therapy', 'Cold Therapy',
+                    'Hydrotherapy', 'Other'].map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Exercises / Modalities */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Exercises / Modalities
+                </label>
+                <textarea
+                  value={treatmentForm.exercises}
+                  onChange={e => setTreatmentForm(f => ({ ...f, exercises: e.target.value }))}
+                  rows={4}
+                  placeholder="e.g. SLR 3×15, Knee extension, TENS 10 min..."
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 resize-none" />
+              </div>
+
+              {/* Precautions */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Precautions / Instructions
+                </label>
+                <textarea
+                  value={treatmentForm.precautions}
+                  onChange={e => setTreatmentForm(f => ({ ...f, precautions: e.target.value }))}
+                  rows={3}
+                  placeholder="e.g. Avoid weight bearing on left leg, No high-impact exercises..."
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 resize-none" />
+              </div>
+
+              {/* Goal */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Goal / Objective
+                </label>
+                <textarea
+                  value={treatmentForm.goal}
+                  onChange={e => setTreatmentForm(f => ({ ...f, goal: e.target.value }))}
+                  rows={3}
+                  placeholder="e.g. Restore full knee ROM, Reduce pain to 2/10 in 4 weeks..."
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 resize-none" />
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button onClick={saveTreatmentPlan} disabled={treatmentLoading}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-50"
+                  style={{ backgroundColor: '#39A900' }}>
+                  <Check size={15} /> {treatmentLoading ? 'Saving…' : 'Save Plan'}
+                </button>
+                <button onClick={() => setShowTreatmentForm(false)}
+                  className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600">
+                  Cancel
+                </button>
+              </div>
+            </div>
+
+          ) : treatment ? (
+            /* ── View mode — plan exists ── */
+            <div className="space-y-3">
+              {/* Therapy Type badge */}
+              <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-gray-100">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Therapy Type</p>
+                <span className="inline-block text-sm font-bold px-3 py-1 rounded-full"
+                  style={{ backgroundColor: '#eff6ff', color: '#1d4ed8' }}>
+                  {treatment.therapy_type || '—'}
+                </span>
+              </div>
+
+              {/* Exercises */}
+              <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-gray-100">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Exercises / Modalities</p>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                  {treatment.exercises || <span className="text-gray-400 italic">None specified</span>}
+                </p>
+              </div>
+
+              {/* Precautions */}
+              <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-amber-100">
+                <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-2">⚠ Precautions / Instructions</p>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                  {treatment.precautions || <span className="text-gray-400 italic">None specified</span>}
+                </p>
+              </div>
+
+              {/* Goal */}
+              <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-gray-100">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Goal / Objective</p>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                  {treatment.goal || <span className="text-gray-400 italic">None specified</span>}
+                </p>
+              </div>
+
+              {/* Last updated footer + Edit button */}
+              <div className="flex items-center justify-between px-1">
+                <p className="text-xs text-gray-400">
+                  Last updated: {format(parseISO(treatment.updated_at), 'dd MMM yyyy')}
+                </p>
+                <button onClick={() => setShowTreatmentForm(true)}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-semibold border transition-colors"
+                  style={{ borderColor: '#F6A000', color: '#F6A000', backgroundColor: '#FEF3C7' }}>
+                  <Pencil size={11} /> Edit Plan
+                </button>
+              </div>
+            </div>
+
+          ) : (
+            /* ── Empty state — no plan yet ── */
+            <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 text-center">
+              <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3"
+                style={{ backgroundColor: '#FEF3C7' }}>
+                <Stethoscope size={26} style={{ color: '#F6A000' }} />
+              </div>
+              <p className="text-sm font-semibold text-gray-700 mb-1">No Treatment Plan Yet</p>
+              <p className="text-xs text-gray-400 mb-4">Add a plan so staff know exactly what to do each session</p>
+              <button onClick={() => setShowTreatmentForm(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold"
+                style={{ backgroundColor: '#F6A000' }}>
+                <Plus size={15} /> Add Treatment Plan
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -127,3 +127,16 @@ export interface WaitingEntry {
   notes: string
   created_at: string
 }
+
+export interface TreatmentPlan {
+  id: string
+  patient_id: string
+  therapy_type: string
+  exercises: string
+  precautions: string
+  goal: string
+  created_by: string
+  updated_by: string
+  created_at: string
+  updated_at: string
+}
