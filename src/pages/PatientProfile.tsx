@@ -15,7 +15,7 @@ function toTitleCase(s: string) {
 }
 
 const ELECTRO_SUGGESTIONS = ['SWD', 'IFT', 'Ice Pack', 'Cervical Traction', 'Lumbar Traction', 'IR']
-const SELF_EX_SUGGESTIONS  = ['Gen Back Care Exercises', 'Both Rotation', 'Isometric Neck Exercises', 'Cervical Stretches', 'Pectoral Stretches']
+const SELF_EX_SUGGESTIONS  = ['Rope And Pulley', 'Stick', 'Finger Ladder', 'Bosy', 'Swissball', 'Wall Sitting']
 const PHYSIO_EX_SUGGESTIONS = ['ULTT', 'Cervical Stretches', 'Pectoral Stretches', 'Both Rotation', 'Isometric Neck Exercises', 'Gen Back Care Exercises']
 
 function TagInput({ label, value, onChange, suggestions }: {
