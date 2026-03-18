@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format } from 'date-fns'
@@ -28,6 +28,10 @@ export default function ReceptionPage({ navigateTo }: { navigateTo?: (page: stri
   const [attended, setAttended] = useState<Attendance[]>([])
   const [addingId, setAddingId] = useState<string | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
+
+  // Derived sets — used for badge display and duplicate prevention in search
+  const attendedPatientIds = useMemo(() => new Set(attended.map(a => a.patient_id)), [attended])
+  const waitingPatientIds = useMemo(() => new Set(queue.map(q => q.patient_id)), [queue])
 
   // ── Load queue + attended on session change ──
   useEffect(() => {
@@ -104,13 +108,29 @@ export default function ReceptionPage({ navigateTo }: { navigateTo?: (page: stri
     setShowDropdown(false)
     setSearchQuery('')
 
-    const { data: existing } = await supabase
-      .from('waiting_list').select('id')
+    // Layer 1: block if already in attendance (admin may have marked directly)
+    const { data: existingAtt } = await supabase
+      .from('attendance').select('id')
       .eq('patient_id', patient.id).eq('date', today)
-      .eq('session', session).eq('status', 'waiting').maybeSingle()
+      .eq('session', session).maybeSingle()
+
+    if (existingAtt) {
+      alert(`${patient.name} has already been attended in today's ${session} session.`)
+      setAddingId(null)
+      return
+    }
+
+    // Layer 2: block if in waiting_list with ANY status (not just 'waiting')
+    const { data: existing } = await supabase
+      .from('waiting_list').select('id, status')
+      .eq('patient_id', patient.id).eq('date', today)
+      .eq('session', session).maybeSingle()
 
     if (existing) {
-      alert(`${patient.name} is already in today's ${session} queue.`)
+      const msg = existing.status === 'done'
+        ? `${patient.name} has already been attended in today's ${session} session.`
+        : `${patient.name} is already in today's ${session} queue.`
+      alert(msg)
       setAddingId(null)
       return
     }
@@ -243,20 +263,41 @@ export default function ReceptionPage({ navigateTo }: { navigateTo?: (page: stri
               </div>
               {showDropdown && searchResults.length > 0 && (
                 <div className="absolute z-30 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-                  {searchResults.map(p => (
-                    <button key={p.id} onMouseDown={() => addToQueue(p)}
-                      disabled={addingId === p.id}
-                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-orange-50 transition-colors border-b border-gray-50 last:border-0">
-                      <div className="text-left">
-                        <p className="text-sm font-semibold text-gray-800">{p.name}</p>
-                        <p className="text-xs text-gray-400">{p.registration_number} · {p.phone}</p>
-                      </div>
-                      <span className="text-xs px-2 py-1 rounded-lg font-medium"
-                        style={{ backgroundColor: '#FEF3C7', color: '#92400e' }}>
-                        + Add
-                      </span>
-                    </button>
-                  ))}
+                  {searchResults.map(p => {
+                    const isAttended = attendedPatientIds.has(p.id)
+                    const isWaiting  = waitingPatientIds.has(p.id)
+                    const isBlocked  = isAttended || isWaiting
+                    return (
+                      <button key={p.id}
+                        onMouseDown={() => !isBlocked && addToQueue(p)}
+                        disabled={addingId === p.id || isBlocked}
+                        className="w-full px-4 py-3 flex items-center justify-between transition-colors border-b border-gray-50 last:border-0"
+                        style={{ backgroundColor: isBlocked ? '#f9fafb' : undefined }}
+                        onMouseEnter={e => { if (!isBlocked) (e.currentTarget as HTMLElement).style.backgroundColor = '#fff7ed' }}
+                        onMouseLeave={e => { if (!isBlocked) (e.currentTarget as HTMLElement).style.backgroundColor = '' }}>
+                        <div className="text-left">
+                          <p className="text-sm font-semibold" style={{ color: isBlocked ? '#9ca3af' : '#1f2937' }}>{p.name}</p>
+                          <p className="text-xs text-gray-400">{p.registration_number} · {p.phone}</p>
+                        </div>
+                        {isAttended ? (
+                          <span className="text-xs px-2 py-1 rounded-lg font-semibold flex items-center gap-1"
+                            style={{ backgroundColor: '#f0fce8', color: '#39A900' }}>
+                            ✓ Attended
+                          </span>
+                        ) : isWaiting ? (
+                          <span className="text-xs px-2 py-1 rounded-lg font-semibold"
+                            style={{ backgroundColor: '#FEF3C7', color: '#92400e' }}>
+                            In Queue
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2 py-1 rounded-lg font-medium"
+                            style={{ backgroundColor: '#FEF3C7', color: '#92400e' }}>
+                            + Add
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>
