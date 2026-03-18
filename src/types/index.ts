@@ -132,9 +132,9 @@ export interface TreatmentPlan {
   id: string
   patient_id: string
   therapy_type: string
-  exercises: string
-  precautions: string
-  goal: string
+  electro_modalities: string
+  self_exercises: string
+  physio_exercises: string
   created_by: string
   updated_by: string
   created_at: string

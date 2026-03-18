@@ -9,6 +9,105 @@ import {
 import WelcomeImageModal from '../components/WelcomeImageModal'
 import type { Patient, Attendance, Payment, Package, TreatmentPlan } from '../types'
 
+// ── Treatment plan helpers ────────────────────────────────────────────────
+function toTitleCase(s: string) {
+  return s.trim().replace(/\b\w/g, c => c.toUpperCase())
+}
+
+const ELECTRO_SUGGESTIONS = ['SWD', 'IFT', 'Ice Pack', 'Cervical Traction', 'Lumbar Traction', 'IR']
+const SELF_EX_SUGGESTIONS  = ['Gen Back Care Exercises', 'Both Rotation', 'Isometric Neck Exercises', 'Cervical Stretches', 'Pectoral Stretches']
+const PHYSIO_EX_SUGGESTIONS = ['ULTT', 'Cervical Stretches', 'Pectoral Stretches', 'Both Rotation', 'Isometric Neck Exercises', 'Gen Back Care Exercises']
+
+function TagInput({ label, value, onChange, suggestions }: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  suggestions: string[]
+}) {
+  const [inputVal, setInputVal] = useState('')
+  const [showDrop, setShowDrop] = useState(false)
+
+  const tags = value ? value.split(',').map(t => t.trim()).filter(Boolean) : []
+  const filtered = suggestions.filter(s =>
+    s.toLowerCase().includes(inputVal.toLowerCase()) && !tags.includes(s)
+  )
+
+  function addTag(raw: string) {
+    const t = toTitleCase(raw)
+    if (t && !tags.includes(t)) onChange([...tags, t].join(', '))
+    setInputVal('')
+    setShowDrop(false)
+  }
+  function removeTag(tag: string) {
+    onChange(tags.filter(t => t !== tag).join(', '))
+  }
+
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{label}</label>
+
+      {/* Selected chips */}
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {tags.map(tag => (
+            <span key={tag} className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-semibold"
+              style={{ backgroundColor: '#eff6ff', color: '#1d4ed8' }}>
+              {tag}
+              <button type="button" onClick={() => removeTag(tag)} className="hover:text-red-500 leading-none">
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Text input with dropdown */}
+      <div className="relative">
+        <input
+          type="text"
+          value={inputVal}
+          onChange={e => { setInputVal(e.target.value); setShowDrop(true) }}
+          onKeyDown={e => {
+            if ((e.key === 'Enter' || e.key === ',') && inputVal.trim()) {
+              e.preventDefault(); addTag(inputVal)
+            } else if (e.key === 'Backspace' && !inputVal && tags.length) {
+              removeTag(tags[tags.length - 1])
+            }
+          }}
+          onFocus={() => setShowDrop(true)}
+          onBlur={() => setTimeout(() => setShowDrop(false), 150)}
+          placeholder="Type to search or add..."
+          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+        />
+        {showDrop && filtered.length > 0 && (
+          <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-40 overflow-y-auto">
+            {filtered.map(s => (
+              <button key={s} type="button" onMouseDown={() => addTag(s)}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-orange-50 border-b last:border-0 border-gray-50">
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Quick-add chips for not-yet-selected suggestions */}
+      {suggestions.filter(s => !tags.includes(s)).length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {suggestions.filter(s => !tags.includes(s)).map(s => (
+            <button key={s} type="button" onMouseDown={() => addTag(s)}
+              className="text-xs px-2 py-0.5 rounded-full border border-dashed text-gray-400 hover:border-orange-400 hover:text-orange-600 transition-colors"
+              style={{ borderColor: '#d1d5db' }}>
+              + {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+// ─────────────────────────────────────────────────────────────────────────
+
 const COMPLAINTS = [
   'Back Pain', 'Neck Pain', 'Knee Pain', 'Shoulder Pain', 'Hip Pain',
   'Ankle Pain', 'Wrist Pain', 'Elbow Pain', 'Sports Injury', 'Post-Surgery Rehab', 'Other',
@@ -43,9 +142,9 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
   const [showTreatmentForm, setShowTreatmentForm] = useState(false)
   const [treatmentForm, setTreatmentForm] = useState({
     therapy_type: '',
-    exercises: '',
-    precautions: '',
-    goal: '',
+    electro_modalities: '',
+    self_exercises: '',
+    physio_exercises: '',
   })
   const [treatmentLoading, setTreatmentLoading] = useState(false)
   // ─────────────────────────────────────────────────────────────────────────
@@ -81,9 +180,9 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
     if (trt) {
       setTreatmentForm({
         therapy_type: trt.therapy_type,
-        exercises: trt.exercises,
-        precautions: trt.precautions,
-        goal: trt.goal,
+        electro_modalities: trt.electro_modalities || '',
+        self_exercises: trt.self_exercises || '',
+        physio_exercises: trt.physio_exercises || '',
       })
     }
   }
@@ -146,9 +245,9 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
     const payload = {
       patient_id: patient.id,
       therapy_type: treatmentForm.therapy_type,
-      exercises: treatmentForm.exercises,
-      precautions: treatmentForm.precautions,
-      goal: treatmentForm.goal,
+      electro_modalities: treatmentForm.electro_modalities,
+      self_exercises: treatmentForm.self_exercises,
+      physio_exercises: treatmentForm.physio_exercises,
       updated_by: staff.id,
       updated_at: new Date().toISOString(),
     }
@@ -608,44 +707,29 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
                 </select>
               </div>
 
-              {/* Exercises / Modalities */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Exercises / Modalities
-                </label>
-                <textarea
-                  value={treatmentForm.exercises}
-                  onChange={e => setTreatmentForm(f => ({ ...f, exercises: e.target.value }))}
-                  rows={4}
-                  placeholder="e.g. SLR 3×15, Knee extension, TENS 10 min..."
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 resize-none" />
-              </div>
+              {/* Electro Modalities */}
+              <TagInput
+                label="Electro Modalities"
+                value={treatmentForm.electro_modalities}
+                onChange={v => setTreatmentForm(f => ({ ...f, electro_modalities: v }))}
+                suggestions={ELECTRO_SUGGESTIONS}
+              />
 
-              {/* Precautions */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Precautions / Instructions
-                </label>
-                <textarea
-                  value={treatmentForm.precautions}
-                  onChange={e => setTreatmentForm(f => ({ ...f, precautions: e.target.value }))}
-                  rows={3}
-                  placeholder="e.g. Avoid weight bearing on left leg, No high-impact exercises..."
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 resize-none" />
-              </div>
+              {/* Self Exercises */}
+              <TagInput
+                label="Self Exercises"
+                value={treatmentForm.self_exercises}
+                onChange={v => setTreatmentForm(f => ({ ...f, self_exercises: v }))}
+                suggestions={SELF_EX_SUGGESTIONS}
+              />
 
-              {/* Goal */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Goal / Objective
-                </label>
-                <textarea
-                  value={treatmentForm.goal}
-                  onChange={e => setTreatmentForm(f => ({ ...f, goal: e.target.value }))}
-                  rows={3}
-                  placeholder="e.g. Restore full knee ROM, Reduce pain to 2/10 in 4 weeks..."
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 resize-none" />
-              </div>
+              {/* Exercise By Physiotherapist */}
+              <TagInput
+                label="Exercise By Physiotherapist"
+                value={treatmentForm.physio_exercises}
+                onChange={v => setTreatmentForm(f => ({ ...f, physio_exercises: v }))}
+                suggestions={PHYSIO_EX_SUGGESTIONS}
+              />
 
               <div className="flex gap-2 pt-1">
                 <button onClick={saveTreatmentPlan} disabled={treatmentLoading}
@@ -672,28 +756,43 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
                 </span>
               </div>
 
-              {/* Exercises */}
+              {/* Electro Modalities */}
               <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-gray-100">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Exercises / Modalities</p>
-                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-                  {treatment.exercises || <span className="text-gray-400 italic">None specified</span>}
-                </p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Electro Modalities</p>
+                {treatment.electro_modalities
+                  ? <div className="flex flex-wrap gap-1.5">
+                      {treatment.electro_modalities.split(',').map(t => t.trim()).filter(Boolean).map(tag => (
+                        <span key={tag} className="text-xs px-2.5 py-1 rounded-full font-semibold"
+                          style={{ backgroundColor: '#eff6ff', color: '#1d4ed8' }}>{tag}</span>
+                      ))}
+                    </div>
+                  : <span className="text-sm text-gray-400 italic">None</span>}
               </div>
 
-              {/* Precautions */}
-              <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-amber-100">
-                <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-2">⚠ Precautions / Instructions</p>
-                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-                  {treatment.precautions || <span className="text-gray-400 italic">None specified</span>}
-                </p>
+              {/* Self Exercises */}
+              <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-gray-100">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Self Exercises</p>
+                {treatment.self_exercises
+                  ? <div className="flex flex-wrap gap-1.5">
+                      {treatment.self_exercises.split(',').map(t => t.trim()).filter(Boolean).map(tag => (
+                        <span key={tag} className="text-xs px-2.5 py-1 rounded-full font-semibold"
+                          style={{ backgroundColor: '#f0fce8', color: '#39A900' }}>{tag}</span>
+                      ))}
+                    </div>
+                  : <span className="text-sm text-gray-400 italic">None</span>}
               </div>
 
-              {/* Goal */}
+              {/* Exercise By Physiotherapist */}
               <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-gray-100">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Goal / Objective</p>
-                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-                  {treatment.goal || <span className="text-gray-400 italic">None specified</span>}
-                </p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Exercise By Physiotherapist</p>
+                {treatment.physio_exercises
+                  ? <div className="flex flex-wrap gap-1.5">
+                      {treatment.physio_exercises.split(',').map(t => t.trim()).filter(Boolean).map(tag => (
+                        <span key={tag} className="text-xs px-2.5 py-1 rounded-full font-semibold"
+                          style={{ backgroundColor: '#FEF3C7', color: '#92400e' }}>{tag}</span>
+                      ))}
+                    </div>
+                  : <span className="text-sm text-gray-400 italic">None</span>}
               </div>
 
               {/* Last updated footer + Edit button */}
