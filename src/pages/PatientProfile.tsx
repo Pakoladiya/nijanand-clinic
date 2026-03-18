@@ -141,7 +141,6 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
   const [treatment, setTreatment] = useState<TreatmentPlan | null>(null)
   const [showTreatmentForm, setShowTreatmentForm] = useState(false)
   const [treatmentForm, setTreatmentForm] = useState({
-    therapy_type: '',
     electro_modalities: '',
     self_exercises: '',
     physio_exercises: '',
@@ -180,7 +179,6 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
     setTreatment(trt || null)
     if (trt) {
       setTreatmentForm({
-        therapy_type: trt.therapy_type,
         electro_modalities: trt.electro_modalities || '',
         self_exercises: trt.self_exercises || '',
         physio_exercises: trt.physio_exercises || '',
@@ -246,7 +244,6 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
     setTreatmentError('')
     const payload = {
       patient_id: patient.id,
-      therapy_type: treatmentForm.therapy_type,
       electro_modalities: treatmentForm.electro_modalities,
       self_exercises: treatmentForm.self_exercises,
       physio_exercises: treatmentForm.physio_exercises,
@@ -701,24 +698,6 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
                 </p>
               )}
 
-              {/* Therapy Type */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Therapy Type
-                </label>
-                <select
-                  value={treatmentForm.therapy_type}
-                  onChange={e => setTreatmentForm(f => ({ ...f, therapy_type: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 bg-white">
-                  <option value="">— Select therapy type —</option>
-                  {['Physiotherapy', 'Exercise Therapy', 'Manual Therapy',
-                    'Electrotherapy', 'Heat Therapy', 'Cold Therapy',
-                    'Hydrotherapy', 'Other'].map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-
               {/* Electro Modalities */}
               <TagInput
                 label="Electro Modalities"
@@ -759,15 +738,6 @@ export default function PatientProfile({ patient, onBack, onPatientUpdated }: Pr
           ) : treatment ? (
             /* ── View mode — plan exists ── */
             <div className="space-y-3">
-              {/* Therapy Type badge */}
-              <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-gray-100">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Therapy Type</p>
-                <span className="inline-block text-sm font-bold px-3 py-1 rounded-full"
-                  style={{ backgroundColor: '#eff6ff', color: '#1d4ed8' }}>
-                  {treatment.therapy_type || '—'}
-                </span>
-              </div>
-
               {/* Electro Modalities */}
               <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-gray-100">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Electro Modalities</p>

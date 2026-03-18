@@ -131,7 +131,6 @@ export interface WaitingEntry {
 export interface TreatmentPlan {
   id: string
   patient_id: string
-  therapy_type: string
   electro_modalities: string
   self_exercises: string
   physio_exercises: string
