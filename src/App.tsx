@@ -10,6 +10,7 @@ import PatientsPage from './pages/Patients'
 import AdminDashboard from './pages/AdminDashboard'
 import ReceptionPage from './pages/Reception'
 import QueuePage from './pages/Queue'
+import { subscribeToPush } from './lib/pushNotifications'
 import './index.css'
 
 function AppContent() {
@@ -23,6 +24,13 @@ function AppContent() {
   useEffect(() => {
     localStorage.setItem('nfc_current_page', page)
   }, [page])
+
+  // When admin is logged in, register service worker + subscribe to push
+  useEffect(() => {
+    if (staff?.role === 'admin') {
+      subscribeToPush(staff.id)
+    }
+  }, [staff?.id])
 
   if (authLoading || deviceLoading) {
     return (

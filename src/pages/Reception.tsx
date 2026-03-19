@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { supabase, logActivity } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { sendQueuePush } from '../lib/pushNotifications'
 import { format } from 'date-fns'
 import { Search, X, ClipboardList, UserCheck, Clock, Sun, Moon, Trash2, CalendarCheck, UserPlus, LogOut } from 'lucide-react'
 import type { Patient, WaitingEntry, Attendance } from '../types'
@@ -141,6 +142,10 @@ export default function ReceptionPage({ navigateTo }: { navigateTo?: (page: stri
     })
     await logActivity(staff.id, 'QUEUE_ADDED',
       `Added ${patient.name} (${patient.registration_number}) to ${session} queue`)
+
+    // Notify admin's phone — fire and forget, never blocks the UI
+    sendQueuePush(patient.name, session)
+
     setAddingId(null)
     loadQueue()
   }
