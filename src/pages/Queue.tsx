@@ -106,15 +106,17 @@ export default function QueuePage({ navigateTo }: { navigateTo?: (page: string, 
 
       const visitNumber = (count || 0) + 1
 
-      // 2. Create attendance record
-      const { error: attErr } = await supabase.from('attendance').insert({
+      // 2. Create attendance record — upsert so a duplicate (e.g. already
+      //    marked via Attendance page or auto-created at registration) is
+      //    silently ignored rather than throwing an error
+      const { error: attErr } = await supabase.from('attendance').upsert({
         patient_id:    entry.patient_id,
         date:          entry.date,
         session:       entry.session,
         visit_number:  visitNumber,
         marked_by:     staff.id,
         is_retroactive: false,
-      })
+      }, { onConflict: 'patient_id,date,session', ignoreDuplicates: true })
       if (attErr) throw attErr
 
       // 3. Record payment if amount entered

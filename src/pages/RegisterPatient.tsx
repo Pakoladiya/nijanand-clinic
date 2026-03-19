@@ -195,6 +195,30 @@ export default function RegisterPatient() {
 
       if (insertError) throw insertError
 
+      // Auto-mark attendance for today — registration day = Visit 1
+      // This prevents double-counting if staff also adds to queue later
+      const autoSession = new Date().getHours() < 14 ? 'morning' : 'evening'
+      const today = format(new Date(), 'yyyy-MM-dd')
+
+      await supabase.from('attendance').upsert({
+        patient_id:   data.id,
+        date:         today,
+        session:      autoSession,
+        visit_number: 1,
+        marked_by:    staff.id,
+        is_retroactive: false,
+      }, { onConflict: 'patient_id,date,session', ignoreDuplicates: true })
+
+      // Add to waiting_list as done so it shows in Queue attended section
+      await supabase.from('waiting_list').upsert({
+        patient_id: data.id,
+        date:       today,
+        session:    autoSession,
+        status:     'done',
+        added_by:   staff.id,
+        notes:      'Auto-added at registration',
+      }, { onConflict: 'patient_id,date,session', ignoreDuplicates: true })
+
       // Auto-record first day charge as a payment
       const firstDayFee = parseFloat(form.first_day_fee) || 0
       if (firstDayFee > 0) {
@@ -202,7 +226,7 @@ export default function RegisterPatient() {
           patient_id: data.id,
           amount: firstDayFee,
           payment_type: 'registration_fee',
-          date: format(new Date(), 'yyyy-MM-dd'),
+          date: today,
           staff_id: staff.id,
           notes: 'Day 1 registration charge',
         })
