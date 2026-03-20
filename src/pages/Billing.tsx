@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { format, parseISO } from 'date-fns'
-import { Search, Printer, X } from 'lucide-react'
+import { Search, Printer, X, Share2 } from 'lucide-react'
+import html2canvas from 'html2canvas'
 import type { Patient } from '../types'
 
 interface ChargeRow {
@@ -254,8 +255,45 @@ function BillPreview({ billNo, billDate, name, age, gender, refBy, joiningDate, 
   rows: ChargeRow[]; total: number
   onClose: () => void
 }) {
+  const [sharing, setSharing] = useState(false)
   const cell: React.CSSProperties = { border: '1px solid #333', padding: '5px 8px', textAlign: 'center' }
   const cellL: React.CSSProperties = { ...cell, textAlign: 'left', fontWeight: 'bold' }
+
+  async function handleShare() {
+    const billEl = document.getElementById('bill-content') as HTMLElement
+    if (!billEl) return
+    setSharing(true)
+    try {
+      const canvas = await html2canvas(billEl, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width: billEl.scrollWidth,
+        height: billEl.scrollHeight,
+      })
+      canvas.toBlob(async (blob) => {
+        if (!blob) { setSharing(false); return }
+        const file = new File([blob], `Bill-${billNo}.png`, { type: 'image/png' })
+        if (navigator.share && navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ title: `Bill #${billNo} - Nijanand Fitness Centre`, files: [file] })
+        } else {
+          // Fallback: download as image
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `Bill-${billNo}.png`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
+        }
+        setSharing(false)
+      }, 'image/png')
+    } catch (err) {
+      console.error('Share failed:', err)
+      setSharing(false)
+    }
+  }
 
   return (
     <>
@@ -265,18 +303,22 @@ function BillPreview({ billNo, billDate, name, age, gender, refBy, joiningDate, 
           body * { visibility: hidden !important; }
           #bill-overlay {
             visibility: visible !important;
-            position: static !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
             background: white !important;
-            display: block !important;
-            overflow: visible !important;
+            overflow: hidden !important;
           }
           #bill-scroll {
             visibility: visible !important;
             overflow: visible !important;
             padding: 0 !important;
             display: block !important;
+            height: auto !important;
           }
-          .bill-no-print { display: none !important; visibility: hidden !important; }
+          .bill-no-print { display: none !important; }
           .bill-printable { visibility: visible !important; box-shadow: none !important; }
           .bill-printable * { visibility: visible !important; }
         }
@@ -289,16 +331,23 @@ function BillPreview({ billNo, billDate, name, age, gender, refBy, joiningDate, 
             <X size={18} /> Close
           </button>
           <span className="text-sm font-semibold text-gray-700">Bill #{billNo}</span>
-          <button onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-sm font-semibold"
-            style={{ backgroundColor: '#39A900' }}>
-            <Printer size={15} /> Share / Print
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={handleShare} disabled={sharing}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-white text-sm font-semibold disabled:opacity-60"
+              style={{ backgroundColor: '#25D366' }}>
+              <Share2 size={15} /> {sharing ? 'Sharing...' : 'Share'}
+            </button>
+            <button onClick={() => window.print()}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-white text-sm font-semibold"
+              style={{ backgroundColor: '#39A900' }}>
+              <Printer size={15} /> Print
+            </button>
+          </div>
         </div>
 
         {/* Scrollable A4 preview */}
         <div id="bill-scroll" className="flex-1 overflow-y-auto py-6 px-4 flex justify-center">
-          <div className="bill-printable bg-white shadow-xl"
+          <div id="bill-content" className="bill-printable bg-white shadow-xl"
             style={{
               width: '210mm',
               minHeight: '297mm',
