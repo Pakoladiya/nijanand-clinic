@@ -39,14 +39,15 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
     const hash = await crypto.subtle.digest('SHA-256', data)
     const hashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')
 
-    const { data: adminStaff } = await supabase
+    const { data: adminStaffList } = await supabase
       .from('staff')
       .select('id')
       .eq('role', 'admin')
       .eq('password_hash', hashHex)
       .eq('is_active', true)
-      .single()
+      .limit(1)
 
+    const adminStaff = adminStaffList?.[0]
     if (!adminStaff) return { error: 'Invalid admin password' }
 
     const token = generateDeviceToken()
