@@ -35,6 +35,8 @@ export default function AdminDashboard({ navigateTo }: { navigateTo?: (page: str
   const [editingTimeStaff, setEditingTimeStaff] = useState<string | null>(null)
   const [timeForm, setTimeForm] = useState({ start: '', end: '' })
   const [backupLoading, setBackupLoading] = useState(false)
+  const [deleteConfirmStaffId, setDeleteConfirmStaffId] = useState<string | null>(null)
+  const [deleteStaffLoading, setDeleteStaffLoading] = useState(false)
 
   useEffect(() => {
     if (tab === 'staff') loadStaff()
@@ -179,6 +181,16 @@ export default function AdminDashboard({ navigateTo }: { navigateTo?: (page: str
   async function toggleStaffActive(s: Staff) {
     await supabase.from('staff').update({ is_active: !s.is_active }).eq('id', s.id)
     await logActivity(staff!.id, 'STAFF_STATUS_CHANGED', `${s.is_active ? 'Deactivated' : 'Activated'} staff: ${s.name}`)
+    loadStaff()
+  }
+
+  async function deleteStaff(s: Staff) {
+    if (!staff) return
+    setDeleteStaffLoading(true)
+    await supabase.from('staff').delete().eq('id', s.id)
+    await logActivity(staff.id, 'STAFF_DELETED', `Deleted staff: ${s.name} (@${s.username})`)
+    setDeleteStaffLoading(false)
+    setDeleteConfirmStaffId(null)
     loadStaff()
   }
 
@@ -415,6 +427,12 @@ export default function AdminDashboard({ navigateTo }: { navigateTo?: (page: str
                       className={`p-1.5 ${s.is_active ? 'text-green-500' : 'text-gray-300'}`}>
                       {s.is_active ? <CheckCircle size={16} /> : <XCircle size={16} />}
                     </button>
+                    {s.id !== staff?.id && (
+                      <button onClick={() => setDeleteConfirmStaffId(deleteConfirmStaffId === s.id ? null : s.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-500">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -454,6 +472,26 @@ export default function AdminDashboard({ navigateTo }: { navigateTo?: (page: str
                       <button
                         onClick={() => setEditingTimeStaff(null)}
                         className="flex-1 py-1.5 rounded-lg text-xs border border-gray-200 text-gray-500 bg-white">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {deleteConfirmStaffId === s.id && (
+                  <div className="mx-4 mb-3 bg-red-50 border border-red-200 rounded-xl p-3">
+                    <p className="text-xs font-semibold text-red-700 mb-2">
+                      Delete <strong>{s.name}</strong>? This cannot be undone.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => deleteStaff(s)}
+                        disabled={deleteStaffLoading}
+                        className="flex-1 py-2 rounded-xl text-white text-xs font-semibold bg-red-500 disabled:opacity-60">
+                        {deleteStaffLoading ? 'Deleting...' : 'Yes, Delete'}
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirmStaffId(null)}
+                        className="flex-1 py-2 rounded-xl text-xs border border-gray-200 text-gray-600 bg-white">
                         Cancel
                       </button>
                     </div>
