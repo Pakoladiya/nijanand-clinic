@@ -264,12 +264,16 @@ function BillPreview({ billNo, billDate, name, age, gender, refBy, joiningDate, 
     if (!billEl) return
     setSharing(true)
     try {
+      // A4 at 96dpi = 794×1123px; scale:2 doubles resolution for sharpness
+      const A4_W = 794, A4_H = 1123
       const canvas = await html2canvas(billEl, {
         scale: 2,
         useCORS: true,
         backgroundColor: '#ffffff',
-        width: billEl.scrollWidth,
-        height: billEl.scrollHeight,
+        width: A4_W,
+        height: A4_H,
+        windowWidth: A4_W,
+        windowHeight: A4_H,
       })
       canvas.toBlob(async (blob) => {
         if (!blob) { setSharing(false); return }
@@ -300,14 +304,14 @@ function BillPreview({ billNo, billDate, name, age, gender, refBy, joiningDate, 
       <style>{`
         @media print {
           @page { size: A4 portrait; margin: 0; }
+          html, body { width: 210mm !important; height: 297mm !important; margin: 0 !important; padding: 0 !important; }
           body * { visibility: hidden !important; }
           #bill-overlay {
             visibility: visible !important;
             position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
+            top: 0 !important; left: 0 !important;
+            width: 210mm !important;
+            height: 297mm !important;
             background: white !important;
             overflow: hidden !important;
           }
@@ -316,10 +320,17 @@ function BillPreview({ billNo, billDate, name, age, gender, refBy, joiningDate, 
             overflow: visible !important;
             padding: 0 !important;
             display: block !important;
-            height: auto !important;
+            width: 210mm !important;
+            height: 297mm !important;
           }
           .bill-no-print { display: none !important; }
-          .bill-printable { visibility: visible !important; box-shadow: none !important; }
+          .bill-printable {
+            visibility: visible !important;
+            box-shadow: none !important;
+            width: 210mm !important;
+            height: 297mm !important;
+            margin: 0 !important;
+          }
           .bill-printable * { visibility: visible !important; }
         }
       `}</style>
@@ -350,7 +361,7 @@ function BillPreview({ billNo, billDate, name, age, gender, refBy, joiningDate, 
           <div id="bill-content" className="bill-printable bg-white shadow-xl"
             style={{
               width: '210mm',
-              minHeight: '297mm',
+              height: '297mm',
               paddingTop: '2in',
               paddingLeft: '14mm',
               paddingRight: '14mm',
@@ -360,6 +371,7 @@ function BillPreview({ billNo, billDate, name, age, gender, refBy, joiningDate, 
               fontSize: '13px',
               color: '#000',
               lineHeight: '1.6',
+              overflow: 'hidden',
             }}>
 
             {/* Bill No + Date */}
