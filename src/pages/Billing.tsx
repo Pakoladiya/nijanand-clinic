@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { format, parseISO } from 'date-fns'
 import { Search, Printer, X, Share2 } from 'lucide-react'
@@ -54,8 +54,18 @@ export default function BillingPage() {
     { label: 'C) Other Charge',      chargePerDay: '', days: '', visitsPerDay: '' },
   ])
   const [billNo, setBillNo]           = useState<number | null>(null)
+  const [billNoInput, setBillNoInput] = useState('')
   const [showPreview, setShowPreview] = useState(false)
   const [busy, setBusy]               = useState(false)
+
+  // Pre-fill bill number with next auto value on mount
+  useEffect(() => {
+    supabase.from('clinic_settings').select('value').eq('key', 'last_bill_number').single()
+      .then(({ data }) => {
+        const next = (parseInt(data?.value || '0') || 0) + 1
+        setBillNoInput(String(next))
+      })
+  }, [])
 
   async function onSearch(q: string) {
     setSearch(q)
@@ -83,15 +93,18 @@ export default function BillingPage() {
   }
 
   async function handleGenerate() {
+    const entered = parseInt(billNoInput) || 1
     setBusy(true)
+    // Update last_bill_number to max(current, entered) so future auto-fill stays ahead
     const { data } = await supabase.from('clinic_settings')
       .select('value').eq('key', 'last_bill_number').single()
-    const next = (parseInt(data?.value || '0') || 0) + 1
+    const current = parseInt(data?.value || '0') || 0
+    const newLast = Math.max(current, entered)
     await supabase.from('clinic_settings').upsert({
-      key: 'last_bill_number', value: String(next),
+      key: 'last_bill_number', value: String(newLast),
       updated_at: new Date().toISOString(),
     })
-    setBillNo(next)
+    setBillNo(entered)
     setBusy(false)
     setShowPreview(true)
   }
@@ -149,9 +162,17 @@ export default function BillingPage() {
 
         <div className="grid grid-cols-2 gap-2">
           <div>
+            <p className="text-xs text-gray-500 mb-1">Bill No.</p>
+            <input type="number" value={billNoInput} onChange={e => setBillNoInput(e.target.value)}
+              placeholder="Auto" className={inp} />
+          </div>
+          <div>
             <p className="text-xs text-gray-500 mb-1">Bill Date</p>
             <input type="date" value={billDate} onChange={e => setBillDate(e.target.value)} className={inp} />
           </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
           <div>
             <p className="text-xs text-gray-500 mb-1">Joining Date</p>
             <input type="date" value={joiningDate} onChange={e => setJoiningDate(e.target.value)} className={inp} />
